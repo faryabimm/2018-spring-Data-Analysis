@@ -1,0 +1,398 @@
+---
+title: "first week: Introduction to R and Rstudio"
+author: "Mohammadmahdi Faryabi - 93101951"
+date: "`r Sys.time()`"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+<div align="center">
+<img  src="images/Rman.jpeg"  align = 'center'>
+</div>
+
+
+<h1 dir="RTL"> 
+تمرین سری اول: چند مساله
+</h1>
+
+<p dir="RTL"> 
+به سوال های زیر را از طریق نوشتن یک کد پاسخ دهید.
+</p>
+
+***
+
+<h2 dir="RTL">
+ماتریس دوستانه
+</h2>
+
+<p dir="RTL">
+یک ماتریس
+$(n,n)$
+که شامل اعداد 
+$1,2,...,n^2$
+است. دوستانه نامیده میشود اگر مجموع سطرها با مجموع ستون های آن برابر شوند. مثال هایی از ماتریس های دوستانه از بعد ۴و۵و۶ ارایه دهید. 
+</p>
+
+
+```{r Q1-1, cache=TRUE}
+find_friendly_matrix <- function(dimention) {
+  repeat {
+    random_vector = sample(dimention ^ 2)
+    random_matrix = matrix(random_vector, nrow = dimention, ncol = dimention)
+  
+    row_sums = rowSums(random_matrix)
+    col_sums = colSums(random_matrix)
+  
+    if (all(row_sums == col_sums) && identical(row_sums, row_sums[row_sums == row_sums[1]])) {
+      return(random_matrix) 
+    }
+  }
+}
+
+# find_friendly_matrix(4)
+# find_friendly_matrix(5)
+# find_friendly_matrix(6)
+print('1st solution')
+print("This code won't terminate in a reasonable time for dimentions larger than 3!")
+```
+
+```{r Q1-2, cache=TRUE}
+magic_square_odd <- function(dimention) {
+  
+  result <- matrix(0, nrow = dimention, ncol = dimention)
+  col_index <- dimention %/% 2 + 1
+  row_index <- 1
+  
+  max_i <- dimention ^ 2
+  
+  for (i in 1:max_i) {
+    result[row_index, col_index] <- i
+    next_row <- if (row_index > 1) row_index - 1 else dimention
+    next_col <- if (col_index < dimention) col_index + 1 else 1
+    
+    if (result[next_row, next_col] != 0) {
+      next_row <- if (row_index < dimention) row_index + 1 else 1
+      next_col <- col_index
+    }
+    row_index <- next_row
+    col_index <- next_col
+  }
+  
+  return(result)
+}
+magic_square_even_four <- function(dimention) {
+  result <- matrix(0, nrow = dimention, ncol = dimention)
+  max_n = dimention ^ 2
+  
+  for (i in 1:dimention) {
+    for (j in 1:dimention) {
+      if ((i <= dimention %/% 4 || i > (dimention * 3) %/% 4) && (j <= dimention %/% 4 || j > (dimention * 3) %/% 4) ||
+          (i > dimention %/% 4 && i <= (dimention * 3) %/% 4) && (j > dimention %/% 4 && j <= (dimention * 3) %/% 4)) {
+        result[i, j] <- (i - 1) * dimention + j
+      } else {
+        result[i, j] <- max_n - ((i - 1) * dimention + j) + 1
+      }
+    }
+  }
+  return(result)
+}
+magic_square_even_two <- function(dimention) {
+  result <- matrix(0, nrow = dimention, ncol = dimention)
+  half_dimention <- dimention / 2
+  quarter_index <- half_dimention ^ 2
+  quarter_mat <- magic_square_odd(half_dimention)
+  
+  result[1:half_dimention, 1:half_dimention] <- quarter_mat + quarter_index * 0
+  result[1:half_dimention, (half_dimention+1):dimention] <- quarter_mat + quarter_index * 2
+  result[(half_dimention+1):dimention, 1:half_dimention] <- quarter_mat + quarter_index * 3
+  result[(half_dimention+1):dimention, (half_dimention+1):dimention] <- quarter_mat + quarter_index * 1
+  
+  lhs_block_width <- (half_dimention - 1) / 2
+  rhs_line_width <- lhs_block_width - 1
+  rhs_top_center_index <- lhs_block_width + 1
+  rhs_bot_center_index <- rhs_top_center_index + half_dimention
+  
+  temp <- result[1:lhs_block_width, 1:lhs_block_width]
+  result[1:lhs_block_width, 1:lhs_block_width] <- result[(half_dimention+1):(half_dimention+lhs_block_width), 1:lhs_block_width]
+  result[(half_dimention+1):(half_dimention+lhs_block_width), 1:lhs_block_width] <- temp
+  
+  temp <- result[(lhs_block_width+2):half_dimention, 1:lhs_block_width]
+  result[(lhs_block_width+2):half_dimention, 1:lhs_block_width] <- result[(dimention-lhs_block_width+1):dimention, 1:lhs_block_width]
+  result[(dimention-lhs_block_width+1):dimention, 1:lhs_block_width] <- temp
+  
+  temp <- result[(1+lhs_block_width),2:(lhs_block_width+1)]
+  result[(1+lhs_block_width),2:(lhs_block_width+1)] <- result[(1+lhs_block_width + half_dimention),2:(lhs_block_width+1)]
+  result[(1+lhs_block_width + half_dimention),2:(lhs_block_width+1)] <- temp
+  
+  if (rhs_line_width > 0) {
+    temp <- result[1:half_dimention, (dimention-rhs_line_width+1):dimention]
+    result[1:half_dimention, (dimention-rhs_line_width+1):dimention] <- result[(half_dimention+1):dimention, (dimention-rhs_line_width+1):dimention]
+    result[(half_dimention+1):dimention, (dimention-rhs_line_width+1):dimention] <- temp
+  }
+  
+  return(result)
+}
+magic_square <- function(dimention) {
+  if (dimention %% 2 == 1) {
+    return(magic_square_odd(dimention))
+  } else {
+    if (dimention %% 4 == 0) {
+      return(magic_square_even_four(dimention))
+    } else {
+      return(magic_square_even_two(dimention))
+    }
+  }
+}
+
+print('2nd solution')
+magic_square(4)
+magic_square(5)
+magic_square(6)
+```
+
+```{r Q1-3, cache=TRUE}
+library(magic)
+print('3rd solution')
+magic.4n(1)
+magic.2np1(2)
+magic.4np2(1)
+```
+
+***
+
+<h2 dir="RTL">
+جایشگت  عجیب
+</h2>
+
+<p dir="RTL">
+جایگشت هایی از اعداد ۱ تا ۱۳ را پیدا کنید که در شرایط زیر صدق کنند:
+</p>
+
+$$ a = (a_1, a_2,..., a_{13})$$
+$$\frac{a_1}{a_2+a_3} = \frac{a_2+a_3}{a_3+a_4+a_5}<1$$
+$$\frac{a_6}{a_6+a_7}= \frac{a_6+a_7}{a_7+a_8+a_9} = \frac{a_7+a_8+a_9}{a_5+a_9+a_{10}} <1$$
+
+$$\frac{a_{11}+a_{12}}{a_{12}+a_{13}}=\frac{a_{12}+a_{13}}{a_{13}+a_{10}}<1$$
+```{r Q2, cache=TRUE}
+find_valid_sequences <- function(n) {
+  index_max <- factorial(n)
+  i <- 0
+  while (i < index_max) {
+    permutation <- find_permutation_by_index(n, i)
+    if (permutation[1] >= sum(permutation[2:3])) {
+      i <- i + factorial(n - 3)
+    } else if (sum(permutation[2:3]) ^ 2 != permutation[1] * sum(permutation[3:5])) {
+      i <- i + factorial(n - 5)
+    } else if (sum(permutation[6:7]) ^ 2 != permutation[6] * sum(permutation[7:9])) {
+      i <- i + factorial(n - 9)
+    } else if (sum(permutation[7:9]) ^ 2 != sum(permutation[6:7]) * sum(permutation[c(5, 9:10)])) {
+      i <- i + factorial(n - 10)
+    } else if (permutation[11] >= permutation[13] ||
+               sum(permutation[11:12]) * sum(permutation[c(10, 13)]) != sum(permutation[12:13]) ^ 2) {
+      i <- i + factorial(n - 13)
+    } else {
+      i <- i + 1
+      print(permutation)
+    }
+  }
+}
+
+find_permutation_by_index <- function(n, index) {
+  result <- numeric(n)
+  sequence <- 1:n
+  first_sequence <- sequence
+  changed <- logical(n)
+
+  for (i in 1:n) {
+    element_index <- index %/% factorial(n - i) + 1
+    element <- sequence[element_index]
+    index <- index %% factorial(n - i)
+    changed[element] <- TRUE
+    sequence <- first_sequence[changed == FALSE]
+    result[i] <- element
+  }
+  return(result)
+}
+
+find_valid_sequences(13)
+```
+
+***
+
+<h2 dir="RTL">
+مچ گیری
+</h2>
+
+<p dir="RTL">
+میزگردی شامل ۱۶ فرد دروغگو و راستگو تشکیل شده است. هر کسی ادعا میکند دو فرد کنار دستی او دروغگو هستند. چند نفر دروغگو در جمع وجود دارد؟
+</p>
+
+```{r Q3-1, cache=TRUE}
+verify_results <- function(bool_vector) {
+  result = TRUE
+  for (i in 1:16) {
+    if (i == 1) {
+      result = (!bool_vector[16] && !bool_vector[2]) && bool_vector[i] ||
+        (bool_vector[16] || bool_vector[2]) && !bool_vector[i]
+    } else if (i == 16) {
+      result = (!bool_vector[1] && !bool_vector[15]) && bool_vector[i] ||
+        (bool_vector[1] || bool_vector[15]) && !bool_vector[i]
+    } else {
+      result = (!bool_vector[i-1] && !bool_vector[i+1]) && bool_vector[i] ||
+        (bool_vector[i-1] || bool_vector[i+1]) && !bool_vector[i]
+    }
+    if (!result) break
+  }
+  return(result)
+}
+
+find_result <- function(bool_vector, index, liers_count) {
+  bool_vector[index] = TRUE
+  if (index == 16) {
+    if (verify_results(bool_vector)) {
+      print(as.integer(bool_vector))
+      liers_count <- union(liers_count, 16 - sum(as.integer(bool_vector)))
+    }
+  } else {
+    liers_count <- find_result(bool_vector, index + 1, liers_count)
+  }
+  bool_vector[index] = FALSE
+  if (index == 16) {
+    if (verify_results(bool_vector)) {
+      print(as.integer(bool_vector))
+      liers_count <- union(liers_count, 16 - sum(as.integer(bool_vector)))
+    }
+  } else {
+    liers_count <- find_result(bool_vector, index + 1, liers_count)
+  }
+  return(liers_count)
+}
+
+print('possible configurations (liers are zeros):')
+liers_count <- integer(0)
+bool_vector <- logical(16)
+liers_count <- find_result(bool_vector, 1, liers_count)
+print('possible count of liers:')
+print(liers_count)
+```
+
+<p dir="RTL">
+میزگرد دیگری شامل ۱۲ نفر فرد راستگو و دروغگو تشکیل شده به طوری که هر فرد ادعا میکند از میان دو نفر کنار دستی یک نفر راستگو و یک نفر دروغگو هستند. چند نفر دروغگو در جمع وجود دارد؟
+</p>
+
+```{r Q3-2, cache=TRUE}
+verify_results <- function(bool_vector) {
+  result = TRUE
+  for (i in 1:12) {
+    if (i == 1) {
+      result = xor(bool_vector[12], bool_vector[2]) && bool_vector[i] ||
+        !xor(bool_vector[12], bool_vector[2]) && !bool_vector[i]
+    } else if (i == 12) {
+      result = xor(bool_vector[1], bool_vector[11]) && bool_vector[i] ||
+        !xor(bool_vector[1], bool_vector[11]) && !bool_vector[i]
+    } else {
+      result = xor(bool_vector[i-1], bool_vector[i+1]) && bool_vector[i] ||
+        !xor(bool_vector[i-1],  bool_vector[i+1]) && !bool_vector[i]
+    }
+    if (!result) break
+  }
+  return(result)
+}
+
+find_result <- function(bool_vector, index, liers_count) {
+  bool_vector[index] = TRUE
+  if (index == 12) {
+    if (verify_results(bool_vector)) {
+      print(as.integer(bool_vector))
+      liers_count <- union(liers_count, 12 - sum(bool_vector))
+    }
+  } else {
+    liers_count <- find_result(bool_vector, index + 1, liers_count)
+  }
+  bool_vector[index] = FALSE
+  if (index == 12) {
+    if (verify_results(bool_vector)) {
+      print(as.integer(bool_vector))
+      liers_count <- union(liers_count, 12 - sum(bool_vector))
+    }
+  } else {
+    liers_count <- find_result(bool_vector, index + 1, liers_count)
+  }
+  return(liers_count)
+}
+
+print('possible configurations (liers are zeros):')
+liers_count <- integer(0)
+bool_vector <- logical(12)
+liers_count <- find_result(bool_vector, 1, liers_count)
+print('possible count of liers:')
+print(liers_count)
+```
+
+<p dir="RTL">
+این دفعه میزگردی هشت نفره تشکیل شده به گونه ایی که چهار نفر ادعا میکنند از از میان دو نفر کنار دستی یکی دروغگو و دیگری راستگوست و چهار نفر دیگر اعلام میکنند که هر دو فرد کنار دستی آنها دروغگو هستند. چند نفر دروغگو در میان جمع است؟
+</p>
+
+```{r Q3-3, cache=TRUE}
+verify_results <- function(bool_vector) {
+  result = TRUE
+  for (i in seq(1, 15, 2)) {
+    if (i == 1) {
+      result = (xor(bool_vector[15], bool_vector[3]) && bool_vector[i] ||
+                  !xor(bool_vector[15], bool_vector[3]) && !bool_vector[i]) && bool_vector[i+1] ||
+        ((!bool_vector[15] && !bool_vector[3]) && bool_vector[i] ||
+           (bool_vector[15] || bool_vector[3]) && !bool_vector[i]) && !bool_vector[i+1]
+    } else if (i == 15) {
+      result = (xor(bool_vector[1], bool_vector[13]) && bool_vector[i] ||
+                  !xor(bool_vector[1], bool_vector[13]) && !bool_vector[i]) && bool_vector[i+1] ||
+        ((!bool_vector[1] && !bool_vector[13]) && bool_vector[i] ||
+           (bool_vector[1] || bool_vector[13]) && !bool_vector[i]) && !bool_vector[i+1]
+    } else {
+      result = (xor(bool_vector[i-2], bool_vector[i+2]) && bool_vector[i] ||
+                  !xor(bool_vector[i-2],  bool_vector[i+2]) && !bool_vector[i]) && bool_vector[i+1] ||
+        ((!bool_vector[i-2] && !bool_vector[i+2]) && bool_vector[i] ||
+           (bool_vector[i-2] || bool_vector[i+2]) && !bool_vector[i]) && !bool_vector[i+1]
+    }
+    if (!result) break
+  }
+  return(result)
+}
+
+find_result <- function(bool_vector, index, liers_count) {
+  bool_vector[index] = FALSE
+  if (sum(bool_vector[seq(2, 16, 2)]) < 4 && index == 16) {
+    return(liers_count)
+  }
+  if (index == 16) {
+    if (verify_results(bool_vector)) {
+      print(as.integer(bool_vector))
+      liers_count <- union(liers_count, 8 - sum(bool_vector[seq(1, 15, 2)]))
+    }
+  } else {
+    liers_count <- find_result(bool_vector, index + 1, liers_count)
+  }
+  bool_vector[index] = TRUE
+  if (sum(bool_vector[seq(2, 16, 2)]) < 4 && index == 16 || sum(bool_vector[seq(2, 16, 2)]) > 4) {
+    return(liers_count)
+  }
+  if (index == 16) {
+    if (verify_results(bool_vector)) {
+      print(as.integer(bool_vector))
+      liers_count <- union(liers_count, 8 - sum(bool_vector[seq(1, 15, 2)]))
+    }
+  } else {
+    liers_count <- find_result(bool_vector, index + 1, liers_count)
+  }
+  return(liers_count)
+}
+
+print('possible configurations (each persion has to consecutive binary flags.')
+print('first one indicates the truthfulness and the second indicates his claim):')
+liers_count <- integer(0)
+bool_vector <- logical(16)
+liers_count <- find_result(bool_vector, 1, liers_count)
+print('possible count of liers:')
+print(liers_count)
+```

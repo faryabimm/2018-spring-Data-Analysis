@@ -1,0 +1,462 @@
+---
+title: "second week: Introduction to R and Rstudio"
+subtitle: "Mobile Data"
+author: "Mohammadmahdi Faryabi - 93101951"
+date: "`r Sys.time()`"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+<div align="center">
+<img  src="images/smartphones.jpg"  align = 'center'>
+</div>
+
+<h1 dir="RTL"> 
+تمرین سری دوم: تلفن همراه شناسی!
+</h1>
+
+> <p dir="RTL"> 
+پکیجهای مورد نیاز را به مستند اضافه میکنیم:
+</p>
+
+```{r GLOBAL, cache=TRUE}
+library(readr)
+library(ggplot2)
+library(dplyr)
+mobile <- read_csv('../mobile_data.csv') # for auto path completion press tab
+```
+
+> <p dir="RTL"> 
+ با استفاده از داده های گوشی های همراه به سوالات زیر پاسخ دهید. 
+برای رسم نمودار از پکیج 
+ggplot2
+استفاده کنید.
+</p>
+
+***
+
+<p dir="RTL">
+۱. کدام شرکت بیشترین تعداد گوشی را تولید کرده است؟
+نمودار ستونی ۲۰ شرکت برتر بر حسب تعداد گوشی تولید کرده را رسم کنید.
+</p>
+
+
+```{r Q1, cache=TRUE}
+# Q1
+mobile %>% group_by(company ) %>% summarise(n = n()) %>%  arrange(desc(n))  %>% slice(1:20) -> data_1
+data_1$company <- factor(data_1$company, levels = data_1$company)
+ggplot(data = data_1) + geom_col(aes(x = company, y = n)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(title = 'companies with most phone models', y = 'phone model count')
+```
+
+> <p dir="RTL"> 
+برای آنکه از به هم ریختن ترتیب شرکتها جلوگیری کنیم سطوح factor آن را خودمان تعریف کردهایم.
+</p>
+
+
+***
+
+<p dir="RTL">
+۲. نمودار زمانی طول عرض  ضخامت و کیفیت دوربین گوشی ها را بکشید
+ و به نمودار هر یک مدل خطی اضافه کنید.
+</p>
+
+```{r Q2, cache=TRUE}
+# Q2_1
+mobile %>% group_by(year) %>% summarise(length = mean(dim_length, na.rm = TRUE)) -> data_2_1
+coef_2_1 <- coef(lm(length ~ year, data = data_2_1))
+q2_1 <- ggplot(data = data_2_1, aes(x = year, y = length)) + geom_point(na.rm = TRUE, colour = 'red') + geom_line(na.rm = TRUE) +
+  geom_abline(intercept = coef_2_1[1], slope = coef_2_1[2]) + labs(title = 'average length over time')
+  
+
+# Q2_2
+mobile %>% group_by(year) %>% summarise(breadth = mean(dim_breadth, na.rm = TRUE)) -> data_2_2
+coef_2_2 <- coef(lm(breadth ~ year, data = data_2_2))
+q2_2 <- ggplot(data = data_2_2, aes(x = year, y = breadth)) + geom_point(na.rm = TRUE, colour = 'red') + geom_line(na.rm = TRUE) +
+  geom_abline(intercept = coef_2_2[1], slope = coef_2_2[2]) + labs(title = 'average breadth over time')
+
+#Q2_3
+mobile %>% group_by(year) %>% summarise(thickness = mean(dim_thickness, na.rm = TRUE)) -> data_2_3
+coef_2_3 <- coef(lm(thickness ~ year, data = data_2_3))
+q2_3 <- ggplot(data = data_2_3, aes(x = year, y = thickness)) + geom_point(na.rm = TRUE, colour = 'red') + geom_line(na.rm = TRUE) +
+  geom_abline(intercept = coef_2_3[1], slope = coef_2_3[2]) + labs(title = 'average thickness over time')
+
+#Q2_4
+mobile %>% group_by(year) %>% summarise(camera = mean(cam_px, na.rm = TRUE)) -> data_2_4
+coef_2_4 <- coef(lm(camera ~ year, data = data_2_4))
+q2_4 <- ggplot(data = data_2_4, aes(x = year, y = camera)) + geom_point(na.rm = TRUE, colour = 'red') + geom_line(na.rm = TRUE) +
+  geom_abline(intercept = coef_2_4[1], slope = coef_2_4[2]) + labs(title = 'average camera mpx over time')
+
+# Q2 SUMMARIZATION
+library(cowplot)
+plot_grid(q2_1, q2_2, q2_3, q2_4) 
+```
+
+> <p dir="RTL"> 
+ برای تولید مدل خطی از تابع coef و تابع مدل خطی lm استفاده کردهایم. ضرایب خروجی را به کمک تابع geom_abline به صورت یک خط رسم کردهایم.
+</p>
+
+***
+
+<p dir="RTL">
+۳. نمودار ستونی متوسط قیمت گوشی بر حسب تعداد سیم کارت و دسترسی به 
+LTE
+را رسم نمایید.
+</p>
+
+```{r Q3, cache=TRUE}
+#Q3
+mobile %>% group_by(LTE, sim_no) %>% summarise(value = mean(price, na.rm = TRUE)) -> data_3
+data_3$sim_no <- factor(data_3$sim_no)
+ggplot(data = data_3) +
+  geom_col(aes(y = value, x = sim_no, color = LTE, fill = LTE), na.rm = TRUE, position = 'dodge') +
+  labs(title = 'average phone price vs number of sims and LTE support', x = 'number of sims', y = 'average price')
+```
+
+***
+
+<p dir="RTL">
+۴. نمودار جعبه ایی ضحامت گوشی هایی که در سال ۲۰۱۷ معرفی شده اند را برحسب اینکه کمیت جک هدفون رسم نمایید
+</p>
+
+```{r Q4, cache=TRUE}
+#Q4
+mobile %>% filter(as.integer(year) == 2017) -> data_4
+ggplot(data = data_4) + geom_boxplot(aes(y = dim_thickness, x = audio_jack), na.rm = TRUE) +
+  labs(title = 'device thickness', y = 'thickness', x = 'audio jack presense')
+```
+><p dir="RTL"> 
+ میتوان نتایج به دست آمده را اینگونه تحلیل کرد:
+ تفاوت ضخامت در گوشیهایی که از LTE پشتیبانی نمیکنند و قبل از میانه هستند کم است و در گوشی های بعد از میانه زیاد!
+ تفاوت ضخامت برای گوشیهایی که از LTE پشتیبامی میکنند پراکندگی زیادی ندارد و قبل و بعد از میانههم تقریبا یکسان است.
+ در گوشیهایی که از LTE  پشتیبانی میکنند، تعداد قابل توجهی دادهی پرت با فاکتور پیشفرض نمودار جعبهای وجود دارد.
+</p>
+
+***
+
+><p dir="RTL">
+۵. مفهوم 
+ppi 
+را در گوشی های موبایل محاسبه و هیستوگرام آن را رسم نمایید.
+همچنین نمودار سالانه متوسط این کمیت را بکشید.
+کدام گوشی بیشترین
+ppi
+را دارد؟
+</p>
+
+```{r Q5, cache=TRUE}
+#Q5_1
+mobile %>% mutate(ppi = sqrt(px_row ^ 2 + px_col ^ 2) / display_size) %>% filter(ppi < 700) -> data_5_1
+plot_5_1 <- ggplot(data = data_5_1) + geom_histogram(aes(x = ppi), binwidth = 10, na.rm = TRUE) +
+  labs(title = 'histogram of device display ppis')
+
+#Q5_2
+data_5_1 %>% group_by(year) %>% summarise(mean_ppi = mean(ppi, na.rm = TRUE)) -> data_5_2
+coef_5_2 <- coef(lm(mean_ppi~year, data = data_5_2))
+
+plot_5_2 <- ggplot(data = data_5_2, aes(x = year, y = mean_ppi)) + geom_point(colour = 'red', na.rm = TRUE) +
+  geom_line(na.rm = TRUE) +
+  geom_abline(intercept = coef_5_2[1], slope = coef_5_2[2]) +
+  labs(title = 'average display ppi over time', y = 'average display ppi')
+
+plot_grid(plot_5_1, plot_5_2)
+```
+
+><p dir="RTL">
+مقدار ppi صفحهی نمایش گوشی را از ریشهی مجموع مجذورهای ابعاد صفحهی نمایش تقسیم بر اندازهی قطر صفحهی نمایش محاسبه کرده و آن را با استفاده از دستور mutate به دادهها میافزاییم.
+سپس با استفاده از دستور geom_histogram توزیع مقدایر آن و با استفاده از دستور geom_line نحوهی تغییراتش با زمان را رسم میکنیم. مشاهده میکنیم که ppi با گذر زمان به صورت خطی افزایش یافته است. همچنین مشاهده میشود که مقادیر ۴۰۰ ، ۳۰۰ و ۱۵۰ پیکسل بر اینچ مقادیر رایجی برای این کمیت هستند.
+</p>
+
+***
+
+<p dir="RTL">
+۶. در گذشته به بعضی از مدل های گوشی نوکیا 
+**گوشکوب**
+گفته می شد. سعی کنید برای این مفهوم کمیتی مناسب تعریف کنید .
+ ده گوشکوب برتر را پیدا کرده و نمودار گوشکوبیت آن را رسم نمایید.
+</p>
+
+```{r Q6, cache=TRUE}
+mobile %>% filter(year < 2010 | display_size > 2) %>%
+  filter(display_size < 7) %>% 
+  mutate(volume = dim_breadth * dim_length * dim_thickness) %>% 
+  mutate(hardness = 1000 * weight / volume * dim_thickness) %>% filter(hardness < Inf) %>% 
+  select(company, device, year, hardness) %>% arrange(desc(hardness)) %>% slice(1:10) %>%
+  mutate(full_name = paste(company, device, year)) %>% select(full_name, hardness) -> data_6
+
+data_6$full_name <- factor(data_6$full_name, levels = data_6$full_name)
+ggplot(data = data_6) + geom_col(aes(x = full_name, y = hardness, fill = hardness)) + coord_flip() +
+  labs(title = 'hardest devices', x = 'device full name')
+```
+
+><p dir="RTL">
+از دانستههای مکانیکی میدانیم که سختی یک جسم (که در این سوال مورد نظر است) ربطی به چگالی آن جسم یا ابعادش (تنها فاکتورهای فیزیکی در دسترس از اشیا) ندارد. اما با فرض اینکه تلفنهای همراه از پلی کربنات، شیشه، آلومینیوم و سیلیکون تشکیل شده باشند میتوان با استفاده از چگالی آنها و قطرشان (قطر مقطعی که به عنوان گوشکوب استفاده میشود  :دی) میزان سختی آنها را تخمین زد.
+به این منظور برای به دست آوردن تخمینی از سختی، چگالی هر گوشی را ضربدر قطر آن کردهایم و آن را به عنوان فاکتوری از سختی در نظر گرفتهایم.
+لازم به ذکر است که در این سوال برای آنکه تنها تلفنهای همراه مورد بررسی قرار بگیرند این شرط را گذاشتهایم که اندازهی صفحهی نمایش زیر ۷ اینچ باشد و در صورتی که دستگاه بعد از سال ۲۰۱۰ تولید شده، اندازه بالای ۲ اینچ هم باشد (خارج کردن ساعتهای هوشمند!).
+</p>
+
+
+***
+
+<p dir="RTL">
+۷. آیا تلفن همراهی وجود دارد که در آب غرق نشود؟
+اگر جواب بله هست تمام گوشی های که این خاصیت را دارند بیابید.
+با کشیدن یک نمودار به این سوال پاسخ دهید.
+</p>
+
+```{r Q7, cache=TRUE}
+#Q7
+
+# mobile %>% mutate(volume = dim_breadth * dim_length * dim_thickness) %>% mutate(density = 1000 * weight/volume) %>% 
+#   filter((year <= 2010 | year > 2010 & display_size > 2) & display_size < 7) %>% arrange(density) %>% View()
+
+mobile %>% mutate(volume = dim_breadth * dim_length * dim_thickness) %>% mutate(dent = 1000 * weight/volume) %>%
+  filter((year <= 2010 | year > 2010 & display_size > 2) & display_size < 7) -> data_7
+
+plot_7_1 <- ggplot(data = data_7) +
+  geom_histogram(aes(x = dent, fill = ifelse(dent < 1, 'red', 'blue')), bins = 1000, na.rm = TRUE) +
+  guides(fill = FALSE) + labs(title = 'histogram of device density', x = 'density', y = 'device count')
+
+#Q7_2
+data_7 %>% mutate(x_pos = 0, full_name = paste(company, device)) %>% filter(dent < 2) -> data_7
+data_7$x_pos <- jitter(data_7$x_pos)
+
+plot_7_2 <- ggplot() + geom_point(data = data_7[which(data_7$dent >= 1),], colour = 'blue', alpha = 0.2, aes(x = x_pos, y = dent)) +
+  geom_point(data = data_7[which(data_7$dent < 1),], colour = 'red', alpha = 0.8, aes(x = x_pos, y = dent)) + 
+  geom_text(data = data_7[which(data_7$dent < 1),], aes(x = x_pos, y = dent, label = full_name), size = 1) +
+  theme(axis.line.x = element_blank(), axis.text.x = element_blank(), axis.ticks.x = element_blank(), axis.title.x = element_blank()) +
+  labs(y = 'density', title = 'distribution of device densities')
+
+plot_grid(plot_7_1, plot_7_2)
+```
+
+><p dir="RTL">
+در این سوال هم با اعمال شرایطی تنها گوشیهای موبایل را مورد بررسی قرار دادهایم. نمودار سمت چپ نمودار توزیع چگالی در نمونهی در دسترس را نشان میدهد و بخش آبی رنگ بخشی است که روی آب خواهد ایستاد.
+در نمودار سمت راست هر نقطه معادل یک دستگاه با چگالی زیر ۲ است و نقاط قرمز رنگ دستگاههایی هستند که روی آب خواهند ماند. نام هر یک از این نقاط روی آن نوشته شده است.
+</p>
+
+***
+
+<p dir="RTL">
+۸. نمودار پراکنش حجم ذخیره سازی باطری و وزن را رسم نمایید.
+میزان همبستگی بین این دو کمیت را محاسبه کنید.
+</p>
+
+```{r Q8, cache=TRUE}
+#Q8_1
+mobile %>% .[complete.cases(.$weight), ] %>% select(weight) %>% filter(weight < 800) -> data_8_1
+plot_8_1 <- ggplot(data = data_8_1) + geom_density(aes(x = weight), colour = 'red')
+
+#Q8_2
+mobile %>% .[complete.cases(.$battery_mah), ] %>% select(battery_mah) -> data_8_2
+plot_8_2 <- ggplot(data = data_8_2) + geom_density(aes(x = battery_mah), colour = 'red') + labs(x = 'battery capacity (mah)')
+
+plot_grid(plot_8_1, plot_8_2)
+
+#Q8_3
+mobile %>% .[complete.cases(.$battery_mah),] %>% .[complete.cases(.$weight),] %>% select(battery_mah, weight) -> data_8_3
+cor(data_8_3[1], data_8_3[2]) # 0.8086273
+```
+><p dir="RTL">
+لازم به توجه است در این نمودار برای ترسیم بهتر از وزنهای بالای ۸۰۰ گرم که دادهی بسیار کمی داشتند صرف نظر شده است.
+</p>
+
+***
+
+<p dir="RTL">
+۹. قیمت پرچمداران یک برند خاص مثلا سامسونگ را بیابید و نمودار قیمت زمان و نام مدل را رسم نمایید.
+</p>
+
+```{r Q9_0, cache=TRUE}
+#Q9_ESHTEBAHI
+mobile %>% filter(price < 1500 & display_size < 7 & display_size > 2) %>% group_by(company) %>%
+  filter(price == max(price)) %>% mutate(full_name = paste(company, device)) %>% arrange(year) -> data_9
+
+data_9$price <- jitter(data_9$price, factor = 50)
+
+data_9$year <- factor(data_9$year, levels = data_9$year %>% unique())
+ggplot(data = data_9, aes(x = year, y = price)) + geom_point(colour = 'red') + 
+  geom_text(aes(label = full_name), hjust=0, vjust=0, size = 3) + labs(title = 'flagship devices over time')
+
+```
+
+><p dir="RTL">
+لازم به ذکر است این نمودار خواستهی سوال نیست! در بخش بعدی به دو روش دقیق و دقیق تر به خواستهی اصلی پاسخ گفته شده است. این نمودار آخرین پرچمداران هر شرکت را نشان میدهد. دقت میکنیم برخی شرکتها مانند توشیبا یا سونی اریکسون مدتهاست موبایل یا پرچمداری تولید نکردهاند.
+</p>
+
+
+```{r Q9_1, cache=TRUE}
+#Q9_solution_1
+mobile %>% filter(company == 'Samsung') %>% group_by(year) %>% top_n(1, price) %>% slice(1) -> data_9_1
+ggplot(data = data_9_1, aes(x = year, y= price)) + geom_point(na.rm = TRUE, colour = 'red') + 
+  geom_line(na.rm = TRUE) + geom_text(aes(label = device), hjust=0, vjust=0, na.rm = TRUE) + 
+  labs(title = 'Samsung flagship devices and their price over time')
+```
+
+><p dir="RTL">
+در این روش برای به دست آوردن پرچمداران هر سالهی سامسونگ،تلفن همراه با بیشترین قیمت را در هر سال به دست آوردهایم.
+</p>
+
+
+```{r Q9_2, cache=TRUE}
+#Q9_solution_2
+mobile %>% filter(company == 'Samsung' & (year <= 2010 | year > 2010 & display_size > 2) & display_size < 7) %>%
+  group_by(year) %>% summarise(avg = mean(price, na.rm = TRUE), var = sd(price, na.rm = TRUE)) %>% 
+  .[complete.cases(.$year,.$avg,.$var),] -> Q9_stats
+min_var_coef <- 1
+max_var_coef <- 7
+mobile %>% filter(company == 'Samsung' & (year <= 2010 | year > 2010 & display_size > 2) & display_size < 7) %>%
+  full_join(Q9_stats) %>% filter(price > (avg + min_var_coef * var) & price < (avg + max_var_coef * var)) %>%
+  group_by(year) %>%  top_n(1, price) %>% slice(1) -> data_9_2
+
+ggplot(data = data_9_2, aes(x = year, y= price)) + geom_point(colour = 'red') + geom_line() +
+  geom_text(aes(label = device), hjust=0, vjust=0) +
+  labs(title = 'Samsung flagship devices and their price over time')
+```
+
+><p dir="RTL">
+در این روش برای به دست آوردن پرچمدار هر سالهی سامسونگ تلفنی انتخاب شده که قیمت آن از میانگین به علاوهی واریانس قیمت گوشیهای سامسونگ در آن سال بیشتر و از میانگین به علاوهی ۷ برابر واریانس قیمت کمتر باشد. لازم به ذکر است این اعداد با مقایسهی نتایج با نتایچ واقعی و با آزمون و خطا به دست آمدهاند.
+در صورتی که چند گوشی در این شروط در یک سال صدق میکردند، گوشی با بالاترین قیمت انتخاب شده است.در صورتی که  بیشتر از یک گوشی در این حالت نیز وجود داشت اولین آنها گزارش شده.
+</p>
+
+***
+
+<p dir="RTL">
+۱۰. سه نمودار جالب رسم کنید و توضیح دهید چرا از نظر شما جالب است؟
+</p>
+
+```{r Q10_1, cache=TRUE}
+#Q10_1
+
+# best phones to buy each year
+# high ppi # large ram # large battery * battrty generation # more thinness # camera px + selfie px
+
+mean_ppi <- mobile %>% mutate(ppi = sqrt(px_row ^ 2 + px_col ^ 2) / display_size) %>% summarise(mean(ppi, na.rm = TRUE)) %>% as.numeric()
+mean_ram <- mobile %>% summarise(mean(ram, na.rm = TRUE)) %>% as.numeric()
+mean_bat <- mobile %>% summarise(mean(battery_mah, na.rm = TRUE)) %>% as.numeric()
+mean_btv <- mobile %>% summarise(mean(bt_v, na.rm = TRUE)) %>% as.numeric()
+mean_pri_cam <- mobile %>% summarise(mean(cam_px, na.rm = TRUE)) %>% as.numeric()
+mean_sec_cam <- mobile %>% summarise(mean(sel_px, na.rm = TRUE)) %>% as.numeric()
+mean_thinness <- mobile %>% summarise(mean(dim_thickness, na.rm = TRUE)) %>% as.numeric()
+mean_thinness <- 1 / mean_thinness
+mean_price <- mobile %>% summarise(mean(price, na.rm = TRUE)) %>% as.numeric()
+mean_price <- 1 / mean_price
+mean_weight <- mobile %>% summarise(mean(weight, na.rm = TRUE)) %>% as.numeric()
+mean_weight <- 1 / mean_weight
+
+f <- 5 # importance factor
+min_spec <- 70
+
+mobile %>% .[complete.cases(.$price), ] %>%  mutate(ppi = sqrt(px_row ^ 2 + px_col ^ 2) / display_size) %>%
+  mutate(hardware_spec = ppi/mean_ppi*f + ram/mean_ram*f + battery_mah/mean_bat*f + bt_v/mean_btv + cam_px/mean_pri_cam*f +
+           sel_px/mean_sec_cam + 1/dim_thickness/mean_thinness*f + 1/weight/mean_weight*f +
+           (LTE == 'Yes')*f + (gps == 'Yes') + (radio == 'Yes') + (nfc == 'Yes') + (wlan == 'Yes') + (audio_jack == 'Yes')) %>% 
+  arrange(desc(hardware_spec)) -> data_10_1
+
+data_10_1 %>% mutate(x_pos = 0, full_name = paste(company, device)) -> data_10_1
+data_10_1$x_pos <- jitter(data_10_1$x_pos)
+
+ ggplot(data = (data_10_1 %>% filter(hardware_spec > min_spec)), aes(x = x_pos, y = hardware_spec)) + geom_point(alpha = 0.8, aes(color = hardware_spec)) + 
+  geom_text(aes(label = full_name), size = 1) +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.x = element_blank()) +
+  labs(y = 'potential value', title = 'distrinution of devices and specs') -> plot_10_1_1
+
+data_10_1 %>% filter(price < 1500) %>% ggplot(.) + 
+  geom_hex(aes(x = hardware_spec, y = price, color = price/hardware_spec)) +
+  labs(x = 'hardware specs', title = 'hardware specifications vs price') -> plot_10_1_2
+
+plot_grid(plot_10_1_1, plot_10_1_2) 
+```
+><p dir="RTL">
+در این بخش سعی شده با مقایسهی قیمت گوشیهای ارائه شده با مشخصات فنی آنها بهترین گوشی قابل خرید را در هر سال مشخص کنیم. به این صورت که به هر یک از ویژگیهای میزان رم، دقت صفحهی نمایش، نازکی، وزن کم، دوربینها، پشتیبانی از LTE، nfc، gps و … یک امتیاز نرمال شده (با میانگین) تخصیص داده شده و در نهایت امتیازات هر گوشی با هم جمع شده اند. برای برخی از خواص یک ضریب اهمیت در نظر گرفته شده است. مثلا پشتیبانی از radio خیلی کم اهمیت تر از میزان حافظهی ram است. در نهایت تلفنها بر اساس میزان مقیاس قدرت سخت افزاری به دست آمده مرتب شدهاند. 
+در نمودار سمت چپ، توزیع قدرت سخت افزاری با قیمت را مشاهده میکنیم . دقت میکنیم بسیاری از گوشیهای ضعیف تر بنا بر دلایلی مثل برند از خیلی از گوشیهای قوی تر قیمت بیشتری دارند! در نمودار سمت چپ هم توزیع گوشی ها بر اساس فاکتور قدرت سخت افزاری آورده شده و روی هر نقطه اسم سازنده و مدل گوشی هم ذکر شده است.
+</p>
+
+
+```{r Q10_2, cache=TRUE}
+# Q10_2
+# incrase in peoples interest in taking selfies
+mobile %>% group_by(year) %>% summarise(mean_selfie = mean(sel_px, na.rm = TRUE)) %>% 
+  ggplot(., aes(x = year, y = mean_selfie)) + geom_line(na.rm = TRUE) + geom_point(na.rm = TRUE, colour = 'red') + 
+  labs(y = 'average selfie cam quality (MegaPixels)', title = 'increase in market\'s request for better selfies')
+
+```
+
+><p dir="RTL">
+ در این بخش با مشاهدهی نحوهی رشد قدرت دوربین سلفی تلفنهای هوشمند طی زمان افزایش اقبال مردم و بازار به دوربین سلفی و گرفتن عکس سلفی را طی چند سال اخیر بررسی کردهایم. مشاهده میشود که علاقهی مردم به عکاسی از خودشان رشد نمایی داشته است!
+</p>
+
+```{r Q10_3, cache=TRUE}
+# Q10_3
+# battery size vs ppi and display size
+mobile %>% mutate(ppi = sqrt(px_row ^ 2 + px_col ^ 2) / display_size) %>% ggplot(., aes(x = ppi, y = battery_mah)) +
+  geom_hex(na.rm = TRUE) +
+  labs(y = 'battery capacity (mah)', title = 'battery capacity vs ppi') -> plot_10_3_1
+
+mobile %>% mutate(ppi = sqrt(px_row ^ 2 + px_col ^ 2) / display_size) %>% ggplot(., aes(x = display_size, y = battery_mah)) +
+  geom_hex(na.rm = TRUE) +
+  labs(y = 'battery capacity (mah)', title = 'battery capacity vs display size', x = 'display size') -> plot_10_3_2
+
+plot_grid(plot_10_3_1, plot_10_3_2)
+
+library(magrittr)
+mobile %>% mutate(ppi = sqrt(px_row ^ 2 + px_col ^ 2) / display_size) %>%
+  .[complete.cases(.$battery_mah, .$ppi),] %$% cor(.$battery_mah, .$ppi) # 0.4474414
+mobile %>% .[complete.cases(.$battery_mah, .$display_size),] %$%
+  cor(.$battery_mah, .$display_size) # 0.8855491
+```
+
+><p dir="RTL">
+در این بخش با استفاده از نمودارهای حرارتی میزان همبستگی اندازهی صفحهی نمایش و دقت آن به میزان باتری قرار گرفته در دستگاه مورد بررسی قرار گرفته است. دقت میشود که همبستگی اول خیلی مشهود تر از همبستگی دوم است.
+</p>
+
+```{r Q10_4, cache=TRUE}
+# Q10_4
+# hardware price changes over time
+mobile %>% mutate(ppi = sqrt(px_row ^ 2 + px_col ^ 2) / display_size) %>%  group_by(year) %>%
+  summarise(hw_spec = (mean(cam_px, na.rm = T)/mean_pri_cam + mean(sel_px, na.rm = T)/mean_sec_cam +
+                       mean(battery_mah, na.rm = T)/mean_bat + mean(ram, na.rm = T)/mean_ram +
+                       mean(bt_v, na.rm = T)/mean_btv + mean(ppi, na.rm = T)/mean_ppi) + 
+                       1/mean(dim_thickness, na.rm = T)/mean_thinness + 1/mean(weight, na.rm = T)/mean_weight,
+            price = mean(price, na.rm = TRUE)) %>% filter(price < 1500) -> data_10_3
+data_10_3 %>% ggplot(., aes(y = price, x = hw_spec)) + geom_line(na.rm = T) + geom_point(na.rm = T, colour = 'red') +
+  labs(title = 'average device specs vs price', x = 'hardware specs', y = 'price') -> plot_10_3_1
+data_10_3 %>% ggplot(., aes(y = price, x = year)) + geom_line(na.rm = T) + geom_point(na.rm = T, colour = 'red') +
+  labs(title = 'average prices vs time') -> plot_10_3_2
+data_10_3 %>% ggplot(., aes(y = hw_spec, x = year)) + geom_line(na.rm = T) + geom_point(na.rm = T, colour = 'red') +
+  labs(title = 'average device specs vs time', y = 'hardware specs') -> plot_10_3_3
+
+plot_grid(plot_10_3_1, plot_10_3_2, plot_10_3_3)
+
+
+```
+><p dir="RTL">
+در این بخش با محاسبهی فاکتور قدرت سخت افزار مانند بخش اول سوال ۱۰ به بررسی تغییرات سه متغیر قدرت سخت افزار، زمان و قیمت تمام شده در طول زمان میپردازیم. 
+مشاهده میشود که قدرت متوسط سخت افزار در طول زمان رشد نمایی داشته است.
+قیمت تمام شدهی نهایی سخت افزار طی زمان و با پیشرفت تکنولوژی و تا قبل از ظهور تلفنهای هوشمند با قطعات پیشرفته کاهش یافته و پس از آن با شیب کمتری افزایش یافته است.
+مشاهده میشود که قدرت متوسط سخت افزار طی زمان افزایش یافته است!
+</p>
+
+
+```{r Q10_5, cache=TRUE}
+# Q10_5
+# camera vs price
+
+mobile %>% filter(price < 1500) %>% mutate(cam_tot_px = cam_px + sel_px) %>% group_by(year) %>%
+  summarise(cam = mean(cam_tot_px, na.rm = T), price = mean(price, na.rm = T)) -> data_10_5
+coef_10_5 <- coef(lm(price~cam, data = data_10_5))
+data_10_5 %>% 
+  ggplot(., aes(x = cam, y = price)) + geom_line(na.rm = T) + geom_point(na.rm = T, colour = 'red') +
+  labs(title = 'camera quality vs price', x = 'total camera qualities') + geom_abline(intercept = coef_10_5[1], slope = coef_10_5[2])
+
+```
+
+><p dir="RTL">
+در این بخش سعی شده تاثیر کیفیت دوربیت گوشی بر قیمت آن مورد بررسی قرار بگیرد. به این منظور معیاری در نظر گرفته شده که برابر جمع کیفیت دوربینهای هر گوشی برای آن گوشی است.مشاهده میشود که با افزایش کیفیت دوربین گوشی، قیمت آن به صورت مشهودی افزایش مییابد! این افزایش قیمت به نظر خطی میآید.
+</p>
