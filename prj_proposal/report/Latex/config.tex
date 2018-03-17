@@ -1,0 +1,99 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%      MAIN DOCUMENT CONFIG      %%%%%%%%%%%%%%%%
+
+\documentclass[12pt]{article}
+\usepackage[a4paper,margin=2cm,top=3cm]{geometry}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%       GRAPHICS  SETTINGS       %%%%%%%%%%%%%%%%
+
+\usepackage{tikz}
+\usepackage{graphicx}
+\usepackage{adjustbox}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%    MATH ENVIORONMENT CONFIG    %%%%%%%%%%%%%%%%
+
+\usepackage{amsmath}
+\usepackage{amsfonts}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%        LISTINGS  CONFIG        %%%%%%%%%%%%%%%%
+
+ \usepackage{fourier}
+\usepackage{enumitem}
+
+\usepackage{xcolor}
+\usepackage{listings}
+\lstdefinestyle{C}{
+	backgroundcolor=\color{gray!10!white},
+	basicstyle=\footnotesize\ttfamily,
+	breaklines=true,
+	commentstyle=\color{gray},
+	frame=single,
+	keywordstyle=\color{blue},
+	language=C,
+	numbers=left,
+	numbersep=5pt,
+	showstringspaces=false,   
+	numberstyle=\tiny\color{gray},
+	rulecolor=\color{gray},
+	stringstyle=\color{purple},
+	tabsize=4}
+
+\lstdefinestyle{plain}{
+	backgroundcolor=\color{gray!10!white},
+	basicstyle=\footnotesize\ttfamily,
+	breaklines=true,
+	frame=single,
+	numbers=left,
+	numbersep=5pt,
+	showstringspaces=false,   
+	tabsize=4}
+	
+
+\lstnewenvironment{code}{\lstset{style=C}\latin}{\endlatin}
+\lstnewenvironment{plaintext}{\lstset{style=plain}\latin}{\endlatin}
+
+\newcommand{\co}[1]{\lr{\lstinline_#1_}}
+
+\newcommand{\q}{
+\bigbreak
+\stepcounter{qs}
+
+\theqs . }
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%        DOCUMENT  CONFIG        %%%%%%%%%%%%%%%%
+
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{fixltx2e}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage{listings}
+\usepackage[extrafootnotefeatures]{xepersian}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%       FONTS AND GRAPHICS       %%%%%%%%%%%%%%%%
+
+\settextfont{IRNazanin}
+\setlatintextfont[Scale=0.8]{Liberation Serif}
+\setdigitfont{Bahij Nazanin}
+\graphicspath{{images/}}
+\lstset{ %Formatting for code in appendix
+%    language=Matlab,
+    basicstyle=\footnotesize,
+    numbers=right,
+    stepnumber=true,
+    showstringspaces=true,
+    tabsize=4,
+    breaklines=true,
+    breakatwhitespace=false,
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%   DOCUMENT SPECIFIC SETTINGS   %%%%%%%%%%%%%%%%
+
+\definecolor{my_grey}{RGB}{59, 54, 54}
