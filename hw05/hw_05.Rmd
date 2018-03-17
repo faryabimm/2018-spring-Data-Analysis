@@ -1,0 +1,330 @@
+---
+title: "Fifth Week: Bootstrap and Resampling Methods"
+subtitle: "Nonparametric Hypothesis tests"
+author: "Mohammadmahdi Faryabi - STD-ID: 93101951"
+date: "`r Sys.time()`"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+<div align="center">
+<img  src="images/NonparametricStatistics_iStock.jpg"  align = 'center'>
+</div>
+
+><p>
+Loading required packages and libraries.
+</p>
+
+```{r Q0, cache=TRUE}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(coin)
+library(highcharter)
+library(magrittr)
+library(ggplot2)
+library(ggmosaic)
+```
+
+> <p dir="RTL"> 
+لطفا با سوالات زیر پاسخ دهید.
+در همه سوالات سطح دقت را ۹۵ درصد در نظر بگیرید.
+</p>
+
+***
+
+<p dir="RTL">
+۱. شرکتی میخواهد تحقیق کند آیا درآمد نمایندگی های آن یکسان است. برای بررسی این موضوع هشت نمایندگی
+به طور تصادفی انتخاب شده اند که به ترتیب میزان فروش آنها عبارت است از 
+102, 300, 102, 100, 205, 105, 71 , 92.
+با توجه به داده آیا عملکرد نمایندگی ها یکسان است؟
+</p>
+
+><p>
+I've used Kolmogorov-Smirnov non-parametric hypothesis test.<br/>
+This test compares two samples assuming thy have the same pdf or tests a sample versus a reference pdf. <br/>
+I've uesd this test via branch sellings data against a discrete 8 * (1/8) pdf and a normal pdf (ok I know this test is quiet non-parametric but it is likely for branch sellings data to behave 'normally'. Any way we can ignore this second test and be good to go :)<br/>
+<br/>
+It's also possible to do this test using chi squared goodness of fit test and also claim the same result.<br/>
+Very low p-values indicate that we can reject null hypothesis that the stores are selling products the same in terms of selling stats.
+<br/>
+<br/>
+These tests are non-parametric and are suitable for when we dont have much data!
+</p>
+
+
+```{r Q1, cache=TRUE}
+############################################################################################################
+# Q1
+
+stores <- c(102, 300, 102, 100, 205, 105, 71, 92)
+#1
+ks.test(stores, rep(1/8, 8))
+#2
+ks.test(stores, 'pnorm')
+#3
+chisq.test(stores, p = rep(1/8, 8))
+```
+
+***
+
+<p dir="RTL">
+۲. آمار فروش شرکتی در دو نوع شعبه سنتی و مدرن در زیر آمده است:
+</p>
+
+Classical stores: 50, 50, 60, 70, 75, 80, 90, 85
+
+Modern stores: 55, 75, 80, 90, 105, 65
+
+<p dir="RTL">
+آیا تفاوتی در عملکرد دو نوع شعبه وجود دارد؟
+</p>
+
+><p>
+I've used Fisher-Pitman's Permutation test and also Wilcoxon rank test which ranks the data in groups and works with ranks instead of the actual data to manage data outliers.<br/>
+The resultig p-value is high and ot is not in confidence hypothesis rejection range.<br/>
+So the null hypothesis that performance of the two kinds of branches is the same cannot be rejected.
+</p>
+
+
+
+```{r Q2, cache=TRUE}
+############################################################################################################
+# Q2
+
+q2_classical <- c(50, 50, 60, 70, 75, 80, 90, 85)
+q2_modern <- c(55, 75, 80, 90, 105, 65)
+
+
+data.frame(sellings = c(q2_classical, q2_modern), type = c(rep('CLASSIC', 8), rep('MODERN', 6))) -> q2_full_data
+
+coin::oneway_test(sellings~type, data=q2_full_data, distribution="exact")
+
+
+oldwarn <- getOption('warn')
+options(warn = -1)
+wilcox.test(sellings~type, data=q2_full_data, distribution="exact")
+options(warn = oldwarn)
+```
+
+***
+
+<p dir="RTL">
+۳. اطلاعات حسابداری ۱۵ شعبه که به صورت تصادفی انتخاب شده اند به شرح زیر است:
+</p>
+
+509, 517, 502, 629, 830, 911, 847, 803, 727, 853, 757, 730, 774, 718, 904
+
+<p dir="RTL">
+شرکت مذکور برای ارتقای فروش خود یک طرح تبلیغاتی جدید را اجرا میکند. پس از طرح جدید نتایج عملکرد شعبه ها  به صورت زیر 
+اندازه گیری شده است
+</p>
+
+517, 508, 523, 730, 821, 940, 818, 821, 842, 842, 709, 688, 787, 780, 901
+
+<p dir="RTL">
+آیا تبلیغات جدید عملکرد فروش را بالا برده است؟
+</p>
+
+
+><p>
+I,ve uesd paired t-test and paired sogned ranked wilcoxon rank tests. this tests challenge measured data relevences with respeect to paired data information.<br/>
+The null hypothesis is that the new branch performance is the same as the old branch performance.<br/>
+Due to high p-value of the tests this hypothesis cannot be rejected.<br/>
+In another words the advertisments may have had no effects at all!
+</p>
+
+```{r Q3, cache=TRUE}
+############################################################################################################
+# Q3
+
+data.frame(
+  before = c(509, 517, 502, 629, 830, 911, 847, 803, 727, 853, 757, 730, 774, 718, 904),
+  after  = c(517, 508, 523, 730, 821, 940, 818, 821, 842, 842, 709, 688, 787, 780, 901)
+  ) %>% mutate(index = 1:n()) -> q3_full_data
+
+q3_full_data %$% wilcox.test(.$before, .$after, paired = TRUE)
+q3_full_data %$% t.test(.$before, .$after, paired = TRUE)
+
+q3_full_data %>% gather(after, before, key = 'when', value = 'score') %>%
+  hchart(type = 'column', hcaes(x = index, y = score, group = when))
+
+
+```
+
+***
+
+<p dir="RTL">
+۴. محصولی در سه رنگ سفید آبی و قرمز تولید شده است.
+پنج شعبه ار فروشگاه سازنده محصول به صورت تصادفی انتخاب شده و اطلاعات فروش آنها در زیر آمده است.
+</p>
+
+| Store | White | Blue | Red |
+| :----: | :----: | :----: | :----: |
+| 1. |	510 |	925 |	730 |
+| 2. | 720 | 735 | 745 |
+| 3. |	930 |	753 |	875 |
+| 4. |	754 |	685 |	610 |
+| 5. |	105	|  |  |
+
+<p dir="RTL">
+با توجه به داده های بالا آیا رنگی خاص در میزان فروش محصولات تاثیر دارد؟
+</p>
+
+><p>
+I've used friedman non parameteric chi-squared rank sum tests for this question. This test adds rank sums in each group; thus if rank sums are identical in each group then the p-value will be equal to 1!<br/>
+In this case the rank sums are equal! hence p-value is 1 and we can say that color factor has had no effect in product sellings.<br/>
+The symmetric form factor of mosaic diagram also proves that sellings are well distributed among colors.
+</p>
+
+```{r Q4, cache=FALSE}
+############################################################################################################
+# Q4
+
+q4_data <- data.frame(row.names = 1:5,
+           White = c(510, 720, 930, 754, 105),
+           Blue  = c(925, 735, 753, 685, NA ),
+           Red   = c(730, 745, 875, 610, NA ))
+
+q4_data %>% as.matrix() %>% friedman.test()
+
+q4_data %>% mutate(store_index = rownames(.)) %>%
+  gather(White, Blue, Red, key = 'color', value = 'sellings') %>%
+  ggplot() + geom_mosaic(aes(x = product(store_index, color), weight = sellings)) + 
+  labs(x = 'color of product', y = 'store (1, 2, 3, 4, 5)')
+
+q4_data %>% plot()
+```
+
+***
+
+<p dir="RTL">
+۵. یک موسسه نظرسنجی نظرات مردم در مورد رضایت از یک محصول که در ماه های فروردین اردیبهشت خرداد و تیر که از طریق تلویزیون 
+تبلیغ شده است را مورد ارزیابی قرار می دهد.این کار بدین صورت است از افرادی در ماه اول سوال پرسیده می شود و در ماه آینده نیز از همان فرد سوال می شود که آیا از محصول مذکور راضی هستی یا خیر.
+با توجه به داده ایی که در پیوست تمرین آمده است آیا تبلیغات تاثیر مثبتی در افزایش رضایت مردم داشته است؟
+</p>
+
+><p>
+I've used friedman non parameteric chi-squared rank sum tests for this question.<br/>
+The null hypothesis asserts that the advertisements has had no effect on people's satisfaction<br/>
+Due to high p-values resulted from the test, we cannot reject the null hypothesis.<br/>
+So advertisements may have actually had no effect on people's satisfactions at all!
+</p>
+
+```{r Q5, cache=TRUE}
+############################################################################################################
+# Q5
+
+q5_data <- read_csv('data/tv.csv')
+q5_data %>% as.matrix() %>% friedman.test()
+```
+
+
+***
+
+<p dir="RTL"> 
+۶. شرکتی در حال تحقیق بر روی این موضوع است که آیا جمعیت شهر تاثیری در نوع میزان مصرف محصولات شرکت دارد.
+با توجه به داده زیر این موضوع را تحقیق کنید؟
+</p>
+
+
+| City size |	| Frequency of service usage | |
+| :---: |  :---:  | :---: | :---: | 
+| | Always	| Sometime | Never |
+| Small	| 151	| 252	| 603 |
+| Medium	| 802	| 603	| 405 |
+| Large	| 753	| 55	| 408 |
+
+><p>
+I've used non-parametric Pearson's chi-squared test for this questin.<br/>
+The null hypothesis is that city size has had no effect on product usages.<br/>
+Resulting test p-values are small and way inside our confidence interval.<br/>
+So it's possible to say that the null hypothesis is wrong and city size has indeed an effect on product usage.<br/>
+Mosaic chart's asymeetric form also helps proving this point!
+</p>
+
+
+```{r Q6, cache=TRUE}
+############################################################################################################
+# Q6
+
+data.frame(Always = c(151, 802, 753), Sometimes = c(252, 603, 55), Never = c(603, 405, 408),
+                      row.names = c('Small', 'Medium', 'Large')) -> q6_full_data
+
+q6_full_data %>% chisq.test()
+q6_full_data %>% mutate(city_size = rownames(.)) %>%
+  gather(Always, Sometimes, Never, key = 'usage_frequency', value = 'score') %>%
+  ggplot() + geom_mosaic(aes(x = product(city_size, usage_frequency), weight = score)) + 
+  labs(x = 'usage frequency', y = 'city size (Small, Medium, Large)')
+
+q6_full_data %>% plot()
+```
+
+***
+
+<p dir="RTL"> 
+۷. شرکتی انتظار دارد با ارایه محصول الف میزان فروش محصول ب افزایش یابد.
+به همین منظور به طور تصادفی از صد مشتری خود اطلاعات مصرف جمع آوری می نماید.
+با توجه به داده های که داده شده آیا ربط معناداری بین فروش این دو محصول وجود دارد؟
+</p>
+
+><p>
+I've used Spearman's correlation test for this test. the null hypothesis is that two variables are not correlated.<br/>
+The resulting correlation coefficient states that our two variables are probably not related! and are independent!<br/>
+The resulting p-value also proves that we cannot reject null hypothesis!<br/>
+The point plot also helps providing a visualization of data distribution.<br/>
+As it can be seen, there is no significant relation between two sets of data!
+</p>
+
+```{r Q7, cache=TRUE}
+############################################################################################################
+# Q7
+
+q7_data <- read_csv('data/consumption.csv')
+q7_data %$% cor.test(.$A, .$B, method = 'spearman')
+q7_data %>% hchart(type = 'point', color = 'red', hcaes(x = A, y = B))
+```
+
+***
+
+<p dir="RTL"> 
+۸. یک شرکت از ۲۰۰۰ نفر از مشتریان خود عامل خرید محصول را مورد سوال قرار میدهد 
+که خلاصه اطلاعات آن را در زیر می توانید مشاهده کنید
+</p>
+
+| Characteristics	| Male	| Female |
+| :---: |  :---:  | :---: |
+| Price	| 301	| 502 |
+| Design	| 353	| 155 |
+| Color	| 558	| 153 |
+
+<p dir="RTL"> 
+آیا جنسیت تاثیری در مشخصه کاربری کالا دارد؟
+</p>
+
+><p>
+I've used non-parametric Pearson's chi-squared test for this questin.<br/>
+The null hypothesis is that customer's gender has had no effect on product purchase motivation factor.<br/>
+Resulting test p-values are small and way inside our confidence interval.<br/>
+So it's possible to say that the null hypothesis is wrong and customer's gender has indeed an effect on product purchase motivation factore.<br/>
+Mosaic chart's asymeetric form also helps proving this point!
+</p>
+
+```{r Q8, cache=TRUE}
+############################################################################################################
+# Q8
+
+data.frame(row.names = c('Price', 'Design', 'Color'),
+                      Male   = c(301, 353, 558),
+                      Female = c(502, 155, 153)) -> q8_full_data
+
+q8_full_data %>% chisq.test()
+
+q8_full_data %>% mutate(product_factor = rownames(.)) %>%
+  gather(Male, Female, key = 'gender', value = 'count') %>%
+  ggplot() + geom_mosaic(aes(x = product(gender, product_factor), weight = count)) + 
+  labs(y = 'customer gender (Female, Male)', x = 'product factor')
+```
+
