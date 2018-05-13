@@ -1,0 +1,170 @@
+---
+title: "Eighth Week: Text Analysis in R - Q4"
+subtitle: "To be, or not to be"
+author: "Mohammadmahdi Faryabi - STD-ID: 93101951"
+date: "`r Sys.time()`"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+<div align="center">
+<img  src="images/dickens1_1.png"  align = 'center'>
+</div>
+
+> <p dir="RTL"> 
+با استفاده از بسته gutenberg داده های لازم را به دست آورید و به سوالات زیر پاسخ دهید.
+</p>
+
+
+```{r Q0, cache=TRUE}
+library(gutenbergr)
+library(readr)
+library(dplyr)
+library(stringr)
+library(tidytext)
+library(highcharter)
+
+
+load('../data/dickens_romans.RData')
+load('../data/shakespeare_romans.RData')
+
+dickens_roman_names <- c(
+  'ThwPickwickPapers',
+  'OliverTwist',
+  'NicholasNickleby',
+  'TheOldCuriosityShop',
+  'BarnabyRudge',
+  'MartinChuzzlewit',
+  'DombeyandSon',
+  'DavidCopperfield',
+  'BleakHouse',
+  'HardTimes',
+  'LittleDorrit',
+  'ATaleofTwoCities',
+  'GreatExpectations',
+  'OurMutualFriend',
+  'TheMysteryofEdwinDrood'
+)
+
+extract_words <- function(data) {
+  data %>% select(text) %>% 
+    str_replace_all(pattern = '"', replacement = '') %>% 
+    str_replace_all(pattern = '`', replacement = '') %>%
+    str_replace_all(pattern = '\'', replacement = '') %>%
+    str_replace_all(pattern = '�', replacement = ' ') %>% 
+    str_replace_all(pattern = '[[:punct:]]', replacement = ' ') %>%
+    str_split(pattern = "\\s+") %>%
+    unlist() %>% table() %>% as.data.frame() %>% slice(-1) -> result
+  colnames(result) <- c('word', 'count')
+  return(result)
+}
+
+extract_words_ordered <- function(data) {
+  data %>% as.data.frame %>% select(text) %>% 
+    str_replace_all(pattern = '"', replacement = '') %>% 
+    str_replace_all(pattern = '`', replacement = '') %>%
+    str_replace_all(pattern = '\'', replacement = '') %>%
+    str_replace_all(pattern = '�', replacement = ' ') %>% 
+    str_replace_all(pattern = '[[:punct:]]', replacement = ' ') %>%
+    str_split(pattern = "\\s+") %>%
+    unlist() %>% as.data.frame() %>% slice(-1) %>% rename(word = '.') -> result
+  return(result)
+}
+
+extract_words_ordered_norename <- function(data) {
+  data %>% as.data.frame %>% select(text) %>% 
+    str_replace_all(pattern = '"', replacement = '') %>% 
+    str_replace_all(pattern = '`', replacement = '') %>%
+    str_replace_all(pattern = '\'', replacement = '') %>%
+    str_replace_all(pattern = '�', replacement = ' ') %>% 
+    str_replace_all(pattern = '[[:punct:]]', replacement = ' ') %>%
+    str_split(pattern = "\\s+") %>%
+    unlist() %>% as.data.frame() %>% slice(-1) -> result
+  return(result)
+}
+
+extract_semantic_words <- function(data) {
+  data %>% extract_words() %>% filter(!(tolower(word) %in% stop_words$word)) -> result
+  return(result)
+}
+
+extract_pure_words <- function(data) {
+  data %>% extract_semantic_words() %>% filter(!(tolower(word) %in% .$word)) -> result
+  return(result)
+}
+```
+
+***
+
+<p dir="RTL">
+۴.  در بسته tidytext داده ایی به نام sentiments وجود دارد که فضای احساسی لغات را مشخص می نماید. با استفاده از این داده نمودار ۲۰ لغت برتر negative و ۲۰ لغت برتر positive را در کنار هم رسم نمایید. با استفاده از این نمودار فضای حاکم بر داستان چگونه ارزیابی می کنید؟ (به طور مثال برای کتاب داستان دو شهر فضای احساسی داستان به ترتیب تکرر در نمودار زیر قابل مشاهده است.)
+</p>
+
+<div align="center">
+<img  src="images/sentiments.png"  align = 'center'>
+</div>
+
+```{r Q4, cache=TRUE}
+################################################################################################
+## Q4
+
+q4_sentiments <- sentiments %>% filter(sentiment %in% c('negative', 'positive')) %>%
+  select(-lexicon, -score) %>% unique()
+
+
+pos_neg_print <- function(i) {
+    dickens_romans[[i]] %>% extract_semantic_words() %>% full_join(q4_sentiments, by = 'word') %>% 
+    .[complete.cases(.),] -> q4_pos_neg
+      rbind(
+    q4_pos_neg %>% filter(sentiment == 'positive') %>% arrange(desc(count)) %>% slice(1:20),
+    q4_pos_neg %>% filter(sentiment == 'negative') %>% arrange(desc(count)) %>% slice(1:20)
+      ) %>% hchart(type = 'column', hcaes(x = word, y = count, group = sentiment)) %>% 
+    hc_title(text = paste('positive and negative words in', dickens_roman_names[i], sep = ' '))
+}
+
+1 %>% pos_neg_print
+2 %>% pos_neg_print
+3 %>% pos_neg_print
+4 %>% pos_neg_print
+5 %>% pos_neg_print
+6 %>% pos_neg_print
+7 %>% pos_neg_print
+8 %>% pos_neg_print
+9 %>% pos_neg_print
+10 %>% pos_neg_print
+11 %>% pos_neg_print
+12 %>% pos_neg_print
+13 %>% pos_neg_print
+14 %>% pos_neg_print
+15 %>% pos_neg_print
+
+q4_all_sentiments <- sentiments %>% select(-lexicon, -score) %>% unique()
+
+
+sentiment_print <- function(i) {
+    dickens_romans[[i]] %>% extract_semantic_words() %>% full_join(q4_all_sentiments, by = 'word') %>% 
+    .[complete.cases(.),] %>% group_by(sentiment) %>% summarise(count = n()) %>% ungroup() %>%
+    arrange(desc(count)) %>% slice(1:8) %>%
+    hchart(type = 'bar', hcaes(x = sentiment, y = count, color = sentiment)) %>% 
+    hc_title(text = paste('sentiments in',dickens_roman_names[i], sep = ' '))
+}
+ 
+1 %>% sentiment_print
+2 %>% sentiment_print
+3 %>% sentiment_print
+4 %>% sentiment_print
+5 %>% sentiment_print
+6 %>% sentiment_print
+7 %>% sentiment_print
+8 %>% sentiment_print
+9 %>% sentiment_print
+10 %>% sentiment_print
+11 %>% sentiment_print
+12 %>% sentiment_print
+13 %>% sentiment_print
+14 %>% sentiment_print
+15 %>% sentiment_print
+
+```

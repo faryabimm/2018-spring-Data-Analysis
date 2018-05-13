@@ -1,0 +1,380 @@
+---
+title: "Eighth Week: Text Analysis in R - Q8"
+subtitle: "To be, or not to be"
+author: "Mohammadmahdi Faryabi - STD-ID: 93101951"
+date: "`r Sys.time()`"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+<div align="center">
+<img  src="images/dickens1_1.png"  align = 'center'>
+</div>
+
+> <p dir="RTL"> 
+با استفاده از بسته gutenberg داده های لازم را به دست آورید و به سوالات زیر پاسخ دهید.
+</p>
+
+
+```{r Q0, cache=TRUE}
+library(gutenbergr)
+library(readr)
+library(dplyr)
+library(stringr)
+library(tidytext)
+library(highcharter)
+
+
+load('../data/dickens_romans.RData')
+load('../data/shakespeare_romans.RData')
+
+dickens_roman_names <- c(
+  'ThwPickwickPapers',
+  'OliverTwist',
+  'NicholasNickleby',
+  'TheOldCuriosityShop',
+  'BarnabyRudge',
+  'MartinChuzzlewit',
+  'DombeyandSon',
+  'DavidCopperfield',
+  'BleakHouse',
+  'HardTimes',
+  'LittleDorrit',
+  'ATaleofTwoCities',
+  'GreatExpectations',
+  'OurMutualFriend',
+  'TheMysteryofEdwinDrood'
+)
+
+extract_words <- function(data) {
+  data %>% select(text) %>% 
+    str_replace_all(pattern = '"', replacement = '') %>% 
+    str_replace_all(pattern = '`', replacement = '') %>%
+    str_replace_all(pattern = '\'', replacement = '') %>%
+    str_replace_all(pattern = '�', replacement = ' ') %>% 
+    str_replace_all(pattern = '[[:punct:]]', replacement = ' ') %>%
+    str_split(pattern = "\\s+") %>%
+    unlist() %>% table() %>% as.data.frame() %>% slice(-1) -> result
+  colnames(result) <- c('word', 'count')
+  return(result)
+}
+
+extract_words_ordered <- function(data) {
+  data %>% as.data.frame %>% select(text) %>% 
+    str_replace_all(pattern = '"', replacement = '') %>% 
+    str_replace_all(pattern = '`', replacement = '') %>%
+    str_replace_all(pattern = '\'', replacement = '') %>%
+    str_replace_all(pattern = '�', replacement = ' ') %>% 
+    str_replace_all(pattern = '[[:punct:]]', replacement = ' ') %>%
+    str_split(pattern = "\\s+") %>%
+    unlist() %>% as.data.frame() %>% slice(-1) %>% rename(word = '.') -> result
+  return(result)
+}
+
+extract_words_ordered_norename <- function(data) {
+  data %>% as.data.frame %>% select(text) %>% 
+    str_replace_all(pattern = '"', replacement = '') %>% 
+    str_replace_all(pattern = '`', replacement = '') %>%
+    str_replace_all(pattern = '\'', replacement = '') %>%
+    str_replace_all(pattern = '�', replacement = ' ') %>% 
+    str_replace_all(pattern = '[[:punct:]]', replacement = ' ') %>%
+    str_split(pattern = "\\s+") %>%
+    unlist() %>% as.data.frame() %>% slice(-1) -> result
+  return(result)
+}
+
+extract_semantic_words <- function(data) {
+  data %>% extract_words() %>% filter(!(tolower(word) %in% stop_words$word)) -> result
+  return(result)
+}
+
+extract_pure_words <- function(data) {
+  data %>% extract_semantic_words() %>% filter(!(tolower(word) %in% .$word)) -> result
+  return(result)
+}
+
+lesmiserebles <- gutenberg_download(135)
+```
+
+***
+
+<p dir="RTL">
+۸. برای کتاب های دیکنز ابتدا هر فصل را جدا کنید. سپی برای هر فصل 
+1-gram, 2-gram
+را استخراج کنید. آیا توزیع  N-gram
+در کارهای دیکنز یکسان است؟ با رسم نمودار هم این موضوع را بررسی کنید.
+</p>
+
+><p>
+n-gram diagrams are based on ordered density data.
+</p>
+
+```{r Q8, cache=TRUE}
+################################################################################################
+## Q8
+
+library(plotly)
+
+extract_chapters <- function(data, chapter_names) {
+  result <- list()
+  result[[1]] <- data %>% filter(chapter == chapter_names[1])
+  
+  for (i in 2:length(chapter_names)) {
+    result[[i]] <- data %>% filter(chapter == chapter_names[i])
+  }
+  
+  return(result)
+}
+
+get_2gram_chapter_slice <- function(chapter_data){
+  chapter_data %>% extract_words_ordered %>% filter(word != '') %>%
+    mutate(word = paste(word, ' ', sep = '')) %>% .$word %>% str_split('') %>% unlist -> chars
+  
+  cbind(
+    chars %>% as.data.frame %>% rename(letter = '.'),
+    chars %>% lead %>% as.data.frame %>% rename(next_letter = '.')
+  ) %>% filter(letter != ' ' & next_letter != ' ') %>%
+    mutate(letter = tolower(letter), next_letter = tolower(next_letter)) -> two_chars
+  
+  two_chars %>% group_by(letter, next_letter) %>% summarise(count = n()) %>% arrange(desc(count)) %>%
+    ungroup %>% mutate(tot = sum(count), ratio = count/tot) %>% mutate(rank = 1:n()) %>% select(rank, ratio) -> result
+  
+  return(result)
+}
+
+get_1gram_chapter_slice <- function(chapter_data){
+  chapter_data %>% extract_words_ordered %>% filter(word != '') %>% .$word %>% str_split('') %>% unlist -> chars
+  
+  chars %>% as.data.frame %>% rename(letter = '.') %>% filter(letter != ' ') %>%
+    mutate(letter = tolower(letter)) -> one_chars
+  
+  one_chars %>% group_by(letter) %>% summarise(count = n()) %>% arrange(desc(count)) %>%
+    ungroup %>% mutate(tot = sum(count), ratio = count/tot) %>% mutate(rank = 1:n()) %>% select(rank, ratio) -> result
+  
+  return(result)
+}
+
+create_2gram_diag_for_book <- function(book_index, book_title) {
+  cbind(
+    dickens_romans[[book_index]]$text %>% str_detect(regex('chapter', ignore_case = TRUE)) %>% as.data.frame %>% rename(chapter = '.'),
+    dickens_romans[[book_index]]$text %>% as.data.frame %>% rename(text = '.')
+  ) %>% mutate(chapter = cumsum(chapter)) %>% group_by(chapter) -> book_chapter_data
+  book_chapter_data %>% group_by(chapter) %>% summarise(line_count = n()) %>% filter(line_count > 100) -> valid_chapters
+  book_chapter_data %>% filter(chapter %in% valid_chapters$chapter) %>% extract_chapters(valid_chapters$chapter) ->
+    chapters
+  
+  matrix <- array(0, c(length(chapters), (100)))
+  
+  for (chapter in 1:length(chapters)) {
+    chapter_ratios <- chapters[[chapter]] %>% get_2gram_chapter_slice %>% .$ratio
+    matrix[chapter,] <- chapter_ratios[1:100]
+  }
+  
+  plot_ly(x=(1:(100)),y=(1:length(chapters)),z=matrix, type="surface") %>%
+    layout(title = paste('2-gram diagram for book', book_title),
+           scene = list(
+             xaxis = list(title = "rank"),
+             yaxis = list(title = "chapter"),
+             zaxis = list(title = "ratio")
+           ))
+  
+}
+
+create_1gram_diag_for_book <- function(book_index, book_title) {
+  cbind(
+    dickens_romans[[book_index]]$text %>% str_detect(regex('chapter', ignore_case = TRUE)) %>% as.data.frame %>% rename(chapter = '.'),
+    dickens_romans[[book_index]]$text %>% as.data.frame %>% rename(text = '.')
+  ) %>% mutate(chapter = cumsum(chapter)) %>% group_by(chapter) -> book_chapter_data
+  book_chapter_data %>% group_by(chapter) %>% summarise(line_count = n()) %>% filter(line_count > 100) -> valid_chapters
+  book_chapter_data %>% filter(chapter %in% valid_chapters$chapter) %>% extract_chapters(valid_chapters$chapter) ->
+    chapters
+  
+  matrix <- array(0, c(length(chapters), (100)))
+  
+  for (chapter in 1:length(chapters)) {
+    chapter_ratios <- chapters[[chapter]] %>% get_1gram_chapter_slice %>% .$ratio
+    matrix[chapter,] <- chapter_ratios[1:100]
+  }
+  
+  plot_ly(x=(1:(100)),y=(1:length(chapters)),z=matrix, type="surface") %>%
+    layout(title = paste('1-gram diagram for book', book_title),
+           scene = list(
+             xaxis = list(title = "rank"),
+             yaxis = list(title = "chapter"),
+             zaxis = list(title = "ratio")
+           ))
+  
+}
+
+1 %>% create_2gram_diag_for_book(dickens_roman_names[1])
+# 2 %>% create_2gram_diag_for_book(dickens_roman_names[2])
+# 3 %>% create_2gram_diag_for_book(dickens_roman_names[3])
+# 4 %>% create_2gram_diag_for_book(dickens_roman_names[4])
+# 5 %>% create_2gram_diag_for_book(dickens_roman_names[5])
+# 6 %>% create_2gram_diag_for_book(dickens_roman_names[6])
+# 7 %>% create_2gram_diag_for_book(dickens_roman_names[7])
+# 8 %>% create_2gram_diag_for_book(dickens_roman_names[8])
+# 9 %>% create_2gram_diag_for_book(dickens_roman_names[9])
+# 10 %>% create_2gram_diag_for_book(dickens_roman_names[10])
+# 11 %>% create_2gram_diag_for_book(dickens_roman_names[11])
+# 13 %>% create_2gram_diag_for_book(dickens_roman_names[13])
+# 14 %>% create_2gram_diag_for_book(dickens_roman_names[14])
+15 %>% create_2gram_diag_for_book(dickens_roman_names[15])
+
+1 %>% create_1gram_diag_for_book(dickens_roman_names[1])
+# 2 %>% create_1gram_diag_for_book(dickens_roman_names[2])
+# 3 %>% create_1gram_diag_for_book(dickens_roman_names[3])
+# 4 %>% create_1gram_diag_for_book(dickens_roman_names[4])
+# 5 %>% create_1gram_diag_for_book(dickens_roman_names[5])
+# 6 %>% create_1gram_diag_for_book(dickens_roman_names[6])
+# 7 %>% create_1gram_diag_for_book(dickens_roman_names[7])
+# 8 %>% create_1gram_diag_for_book(dickens_roman_names[8])
+# 9 %>% create_1gram_diag_for_book(dickens_roman_names[9])
+# 10 %>% create_1gram_diag_for_book(dickens_roman_names[10])
+# 11 %>% create_1gram_diag_for_book(dickens_roman_names[11])
+# 13 %>% create_1gram_diag_for_book(dickens_roman_names[13])
+# 14 %>% create_1gram_diag_for_book(dickens_roman_names[14])
+15 %>% create_1gram_diag_for_book(dickens_roman_names[15])
+
+```
+
+><p>
+n-gram diagrams are based on unordered density data. (a better visualization)
+</p>
+
+```{r Q8b, cache=TRUE}
+################################################################################################
+## Q8
+
+set <- c(0:9, letters[1:26])
+
+expand.grid(set, set) %>% rename(letter = Var1, next_letter = Var2) %>% mutate(index = 1:n()) -> data_map
+
+data_map_one <- set %>% as.data.frame %>% rename(letter = '.') %>% mutate(index = 1:n())
+
+library(plotly)
+
+extract_chapters <- function(data, chapter_names) {
+  result <- list()
+  result[[1]] <- data %>% filter(chapter == chapter_names[1])
+  
+  for (i in 2:length(chapter_names)) {
+    result[[i]] <- data %>% filter(chapter == chapter_names[i])
+  }
+  
+  return(result)
+}
+
+get_2gram_chapter_slice <- function(chapter_data){
+  chapter_data %>% extract_words_ordered %>% filter(word != '') %>%
+    mutate(word = paste(word, ' ', sep = '')) %>% .$word %>% str_split('') %>% unlist -> chars
+  
+  cbind(
+    chars %>% as.data.frame %>% rename(letter = '.'),
+    chars %>% lead %>% as.data.frame %>% rename(next_letter = '.')
+  ) %>% filter(letter != ' ' & next_letter != ' ') %>%
+    mutate(letter = tolower(letter), next_letter = tolower(next_letter)) -> two_chars
+  
+  two_chars %>% group_by(letter, next_letter) %>% summarise(count = n()) %>%
+    ungroup %>% mutate(tot = sum(count), ratio = count/tot) %>% select(letter, next_letter, ratio) -> result
+  
+  return(result)
+}
+
+get_1gram_chapter_slice <- function(chapter_data){
+  chapter_data %>% extract_words_ordered %>% filter(word != '') %>% .$word %>% str_split('') %>% unlist -> chars
+  
+  chars %>% as.data.frame %>% rename(letter = '.') %>% filter(letter != ' ') %>%
+    mutate(letter = tolower(letter)) -> one_chars
+  
+  one_chars %>% group_by(letter) %>% summarise(count = n()) %>%
+    ungroup %>% mutate(tot = sum(count), ratio = count/tot) %>% select(letter, ratio) -> result
+  
+  return(result)
+}
+
+create_2gram_diag_for_book <- function(book_index, book_title) {
+  cbind(
+    dickens_romans[[book_index]]$text %>% str_detect(regex('chapter', ignore_case = TRUE)) %>% as.data.frame %>% rename(chapter = '.'),
+    dickens_romans[[book_index]]$text %>% as.data.frame %>% rename(text = '.')
+  ) %>% mutate(chapter = cumsum(chapter)) %>% group_by(chapter) -> book_chapter_data
+  book_chapter_data %>% group_by(chapter) %>% summarise(line_count = n()) %>% filter(line_count > 100) -> valid_chapters
+  book_chapter_data %>% filter(chapter %in% valid_chapters$chapter) %>% extract_chapters(valid_chapters$chapter) ->
+    chapters
+  
+  matrix <- array(0, c(length(chapters), (36*36)))
+  
+  for (chapter in 1:length(chapters)) {
+    chapter_ratios <- chapters[[chapter]] %>% get_2gram_chapter_slice %>% full_join(data_map) %>% mutate(ratio = ifelse(is.na(ratio), 0, ratio))
+    matrix[chapter,] <- chapter_ratios$ratio
+  }
+  
+  plot_ly(x=(1:(100)),y=(1:length(chapters)),z=matrix, type="surface") %>%
+    layout(title = paste('2-gram diagram for book', book_title),
+           scene = list(
+             xaxis = list(title = "rank"),
+             yaxis = list(title = "chapter"),
+             zaxis = list(title = "ratio")
+           ))
+}
+
+
+
+create_1gram_diag_for_book <- function(book_index, book_title) {
+  cbind(
+    dickens_romans[[book_index]]$text %>% str_detect(regex('chapter', ignore_case = TRUE)) %>% as.data.frame %>% rename(chapter = '.'),
+    dickens_romans[[book_index]]$text %>% as.data.frame %>% rename(text = '.')
+  ) %>% mutate(chapter = cumsum(chapter)) %>% group_by(chapter) -> book_chapter_data
+  book_chapter_data %>% group_by(chapter) %>% summarise(line_count = n()) %>% filter(line_count > 100) -> valid_chapters
+  book_chapter_data %>% filter(chapter %in% valid_chapters$chapter) %>% extract_chapters(valid_chapters$chapter) ->
+    chapters
+  
+  matrix <- array(0, c(length(chapters), (36)))
+  
+  for (chapter in 1:length(chapters)) {
+    chapter_ratios <- chapters[[chapter]] %>% get_1gram_chapter_slice %>% full_join(data_map_one) %>% mutate(ratio = ifelse(is.na(ratio), 0, ratio))
+    matrix[chapter,] <- chapter_ratios$ratio
+  }
+  
+  plot_ly(x=(1:(11)),y=(1:length(chapters)),z=matrix, type="surface") %>%
+    layout(title = paste('1-gram diagram for book', book_title),
+           scene = list(
+             xaxis = list(title = "rank"),
+             yaxis = list(title = "chapter"),
+             zaxis = list(title = "ratio")
+           ))
+  
+}
+
+1 %>% create_2gram_diag_for_book(dickens_roman_names[1])
+# 2 %>% create_2gram_diag_for_book(dickens_roman_names[2])
+# 3 %>% create_2gram_diag_for_book(dickens_roman_names[3])
+# 4 %>% create_2gram_diag_for_book(dickens_roman_names[4])
+# 5 %>% create_2gram_diag_for_book(dickens_roman_names[5])
+# 6 %>% create_2gram_diag_for_book(dickens_roman_names[6])
+# 7 %>% create_2gram_diag_for_book(dickens_roman_names[7])
+# 8 %>% create_2gram_diag_for_book(dickens_roman_names[8])
+# 9 %>% create_2gram_diag_for_book(dickens_roman_names[9])
+# 10 %>% create_2gram_diag_for_book(dickens_roman_names[10])
+# 11 %>% create_2gram_diag_for_book(dickens_roman_names[11])
+# 13 %>% create_2gram_diag_for_book(dickens_roman_names[13])
+# 14 %>% create_2gram_diag_for_book(dickens_roman_names[14])
+15 %>% create_2gram_diag_for_book(dickens_roman_names[15])
+
+1 %>% create_1gram_diag_for_book(dickens_roman_names[1])
+# 2 %>% create_1gram_diag_for_book(dickens_roman_names[2])
+# 3 %>% create_1gram_diag_for_book(dickens_roman_names[3])
+# 4 %>% create_1gram_diag_for_book(dickens_roman_names[4])
+# 5 %>% create_1gram_diag_for_book(dickens_roman_names[5])
+# 6 %>% create_1gram_diag_for_book(dickens_roman_names[6])
+# 7 %>% create_1gram_diag_for_book(dickens_roman_names[7])
+# 8 %>% create_1gram_diag_for_book(dickens_roman_names[8])
+# 9 %>% create_1gram_diag_for_book(dickens_roman_names[9])
+# 10 %>% create_1gram_diag_for_book(dickens_roman_names[10])
+# 11 %>% create_1gram_diag_for_book(dickens_roman_names[11])
+# 13 %>% create_1gram_diag_for_book(dickens_roman_names[13])
+# 14 %>% create_1gram_diag_for_book(dickens_roman_names[14])
+15 %>% create_1gram_diag_for_book(dickens_roman_names[15])
+```

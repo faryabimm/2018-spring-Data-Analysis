@@ -1,0 +1,235 @@
+---
+title: "Eighth Week: Text Analysis in R - Q10"
+subtitle: "To be, or not to be"
+author: "Mohammadmahdi Faryabi - STD-ID: 93101951"
+date: "`r Sys.time()`"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+<div align="center">
+<img  src="images/dickens1_1.png"  align = 'center'>
+</div>
+
+> <p dir="RTL"> 
+با استفاده از بسته gutenberg داده های لازم را به دست آورید و به سوالات زیر پاسخ دهید.
+</p>
+
+
+```{r Q0, cache=TRUE}
+library(gutenbergr)
+library(readr)
+library(dplyr)
+library(stringr)
+library(tidytext)
+library(highcharter)
+
+
+load('../data/dickens_romans.RData')
+load('../data/shakespeare_romans.RData')
+
+dickens_roman_names <- c(
+  'ThwPickwickPapers',
+  'OliverTwist',
+  'NicholasNickleby',
+  'TheOldCuriosityShop',
+  'BarnabyRudge',
+  'MartinChuzzlewit',
+  'DombeyandSon',
+  'DavidCopperfield',
+  'BleakHouse',
+  'HardTimes',
+  'LittleDorrit',
+  'ATaleofTwoCities',
+  'GreatExpectations',
+  'OurMutualFriend',
+  'TheMysteryofEdwinDrood'
+)
+
+extract_words <- function(data) {
+  data %>% select(text) %>% 
+    str_replace_all(pattern = '"', replacement = '') %>% 
+    str_replace_all(pattern = '`', replacement = '') %>%
+    str_replace_all(pattern = '\'', replacement = '') %>%
+    str_replace_all(pattern = '�', replacement = ' ') %>% 
+    str_replace_all(pattern = '[[:punct:]]', replacement = ' ') %>%
+    str_split(pattern = "\\s+") %>%
+    unlist() %>% table() %>% as.data.frame() %>% slice(-1) -> result
+  colnames(result) <- c('word', 'count')
+  return(result)
+}
+
+extract_words_ordered <- function(data) {
+  data %>% as.data.frame %>% select(text) %>% 
+    str_replace_all(pattern = '"', replacement = '') %>% 
+    str_replace_all(pattern = '`', replacement = '') %>%
+    str_replace_all(pattern = '\'', replacement = '') %>%
+    str_replace_all(pattern = '�', replacement = ' ') %>% 
+    str_replace_all(pattern = '[[:punct:]]', replacement = ' ') %>%
+    str_split(pattern = "\\s+") %>%
+    unlist() %>% as.data.frame() %>% slice(-1) %>% rename(word = '.') -> result
+  return(result)
+}
+
+extract_words_ordered_norename <- function(data) {
+  data %>% as.data.frame %>% select(text) %>% 
+    str_replace_all(pattern = '"', replacement = '') %>% 
+    str_replace_all(pattern = '`', replacement = '') %>%
+    str_replace_all(pattern = '\'', replacement = '') %>%
+    str_replace_all(pattern = '�', replacement = ' ') %>% 
+    str_replace_all(pattern = '[[:punct:]]', replacement = ' ') %>%
+    str_split(pattern = "\\s+") %>%
+    unlist() %>% as.data.frame() %>% slice(-1) -> result
+  return(result)
+}
+
+extract_semantic_words <- function(data) {
+  data %>% extract_words() %>% filter(!(tolower(word) %in% stop_words$word)) -> result
+  return(result)
+}
+
+extract_pure_words <- function(data) {
+  data %>% extract_semantic_words() %>% filter(!(tolower(word) %in% .$word)) -> result
+  return(result)
+}
+```
+
+
+***
+
+<p dir="RTL"> 
+۱۰. بر اساس دادهایی که در تمرین ۸ و ۹ از آثار دو نویسنده به دست آوردید و با استفاده از  N-gram ها یک مدل لاجستیک برای تشخیص صاحب اثر بسازید. خطای مدل چقدر است؟ برای یادگیری مدل از کتاب کتاب الیور تویست اثر دیکنز و کتاب پیرمرد و دریا استفاده نکنید. پس از ساختن مدل برای تست کردن فصل های این کتابها را به عنوان داده ورودی به مدل بدهید. خطای تشخیص چقدر است؟
+</p>
+
+><p>
+Its clearly obvious that the model is so much powerfull that it predicts all of the cross validation samples correctly!<br/>
+<br/>
+I need to say that using h2o glm with nfolds parameter in equivallent to what is asked in the question.
+<br/>
+<div align="center">
+<img  src="images/1.png"  align = 'center'>
+</div>
+<div align="center">
+<img  src="images/2.png"  align = 'center'>
+</div>
+<div align="center">
+<img  src="images/3.png"  align = 'center'>
+</div>
+</p>
+
+
+```{r Q10, cache=TRUE}
+################################################################################################
+## Q10
+
+set <- c(0:9, letters[1:26])
+expand.grid(set, set) %>% rename(letter = Var1, next_letter = Var2) %>% mutate(index = 1:n()) -> data_map
+
+dickens_all_romans <- dickens_romans[[1]]
+for (i in 2:length(dickens_romans)) {
+  rbind(
+    dickens_all_romans,
+    dickens_romans[[i]]
+  ) -> dickens_all_romans
+}
+
+
+shakespeare_all_romans <- shakespeare_romans[[1]]
+for (i in 2:length(shakespeare_romans)) {
+  rbind(
+    shakespeare_all_romans,
+    shakespeare_romans[[i]]
+  ) -> shakespeare_all_romans
+}
+
+
+q5_tot_n <- nrow(shakespeare_all_romans)
+parts_n <- 400 # will make 200 sets of data
+split(shakespeare_all_romans, rep(1:ceiling(q5_tot_n/parts_n), each=parts_n, length.out=q5_tot_n)) -> sh_equal_parts
+
+# sh_result <- data.frame(matrix(ncol = (36*36), nrow = 0))
+# colnames(sh_result) <- c(1:(36*36))
+# 
+# 
+# 
+# for (i in 1:length(sh_equal_parts)) {
+#   sh_equal_parts[[i]] %>% extract_words_ordered %>% filter(word != '') %>%
+#     mutate(word = paste(word, ' ', sep = '')) %>% .$word %>% str_split('') %>% unlist -> chars
+#   
+#   cbind(
+#     chars %>% as.data.frame %>% rename(letter = '.'),
+#     chars %>% lead %>% as.data.frame %>% rename(next_letter = '.')
+#   ) %>% filter(letter != ' ' & next_letter != ' ') %>%
+#     mutate(letter = tolower(letter), next_letter = tolower(next_letter)) -> two_chars
+#   
+#   two_chars %>% group_by(letter, next_letter) %>% summarise(count = n()) %>% ungroup %>%
+#     mutate(tot = sum(count), ratio = count/tot) %>% select(letter, next_letter, ratio) %>%
+#     right_join(data_map) %>% mutate(ratio = ifelse(is.na(ratio), 0, ratio)) %>% select(ratio) -> res
+#   
+#   colnames <- 1:(36*36)
+#   
+#   res %>% t -> res
+#   colnames(res) <- colnames
+#   rbind(sh_result, res) -> sh_result
+#   print(i)
+# }
+# 
+# sh_result$id <- 1:length(sh_equal_parts)
+# sh_result$author <- 'Shakespeare'
+
+# save(sh_result, file = '../data/sh_result.RData')
+load('../data/sh_result.RData')
+
+q5_tot_n <- nrow(dickens_all_romans)
+parts_n <- 500 # will make 200 sets of data
+split(dickens_all_romans, rep(1:ceiling(q5_tot_n/parts_n), each=parts_n, length.out=q5_tot_n)) -> dk_equal_parts
+
+# dk_result <- data.frame(matrix(ncol = (36*36), nrow = 0))
+# colnames(dk_result) <- c(1:(36*36))
+# 
+# 
+# 
+# 
+# for (i in 1:length(dk_equal_parts)) {
+#   dk_equal_parts[[i]] %>% extract_words_ordered %>% filter(word != '') %>%
+#     mutate(word = paste(word, ' ', sep = '')) %>% .$word %>% str_split('') %>% unlist -> chars
+#   
+#   cbind(
+#     chars %>% as.data.frame %>% rename(letter = '.'),
+#     chars %>% lead %>% as.data.frame %>% rename(next_letter = '.')
+#   ) %>% filter(letter != ' ' & next_letter != ' ') %>%
+#     mutate(letter = tolower(letter), next_letter = tolower(next_letter)) -> two_chars
+#   
+#   two_chars %>% group_by(letter, next_letter) %>% summarise(count = n()) %>% ungroup %>%
+#     mutate(tot = sum(count), ratio = count/tot) %>% select(letter, next_letter, ratio) %>%
+#     right_join(data_map) %>% mutate(ratio = ifelse(is.na(ratio), 0, ratio)) %>% select(ratio) -> res
+#   
+#   colnames <- 1:(36*36)
+#   
+#   res %>% t -> res
+#   colnames(res) <- colnames
+#   rbind(dk_result, res) -> dk_result
+#   print(i)
+# }
+# 
+# 
+# dk_result$id <- (1+length(sh_equal_parts)):(length(dk_equal_parts) + length(sh_equal_parts))
+# dk_result$author <- 'Dickens'
+# 
+# save(dk_result, file = '../data/dk_result.RData')
+load('../data/dk_result.RData')
+
+
+rbind(sh_result, dk_result) %>% mutate(author = author == 'Dickens') -> model_data
+
+library(h2o)
+h2o.init()
+model_data_h2o <- as.h2o(model_data)
+
+h2o_model <- h2o.glm(y = "author", x=1:(36*36),
+                                  training_frame = model_data_h2o, family="binomial" ,nfolds = 5)
+h2o_model %>% print
+
+```

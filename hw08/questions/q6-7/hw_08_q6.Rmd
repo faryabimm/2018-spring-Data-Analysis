@@ -1,0 +1,173 @@
+---
+title: "Eighth Week: Text Analysis in R - Q67"
+subtitle: "To be, or not to be"
+author: "Mohammadmahdi Faryabi - STD-ID: 93101951"
+date: "`r Sys.time()`"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+<div align="center">
+<img  src="images/dickens1_1.png"  align = 'center'>
+</div>
+
+> <p dir="RTL"> 
+با استفاده از بسته gutenberg داده های لازم را به دست آورید و به سوالات زیر پاسخ دهید.
+</p>
+
+
+```{r Q0, cache=TRUE}
+library(gutenbergr)
+library(readr)
+library(dplyr)
+library(stringr)
+library(tidytext)
+library(highcharter)
+
+
+load('../data/dickens_romans.RData')
+load('../data/shakespeare_romans.RData')
+
+dickens_roman_names <- c(
+  'ThwPickwickPapers',
+  'OliverTwist',
+  'NicholasNickleby',
+  'TheOldCuriosityShop',
+  'BarnabyRudge',
+  'MartinChuzzlewit',
+  'DombeyandSon',
+  'DavidCopperfield',
+  'BleakHouse',
+  'HardTimes',
+  'LittleDorrit',
+  'ATaleofTwoCities',
+  'GreatExpectations',
+  'OurMutualFriend',
+  'TheMysteryofEdwinDrood'
+)
+
+extract_words <- function(data) {
+  data %>% select(text) %>% 
+    str_replace_all(pattern = '"', replacement = '') %>% 
+    str_replace_all(pattern = '`', replacement = '') %>%
+    str_replace_all(pattern = '\'', replacement = '') %>%
+    str_replace_all(pattern = '�', replacement = ' ') %>% 
+    str_replace_all(pattern = '[[:punct:]]', replacement = ' ') %>%
+    str_split(pattern = "\\s+") %>%
+    unlist() %>% table() %>% as.data.frame() %>% slice(-1) -> result
+  colnames(result) <- c('word', 'count')
+  return(result)
+}
+
+extract_words_ordered <- function(data) {
+  data %>% as.data.frame %>% select(text) %>% 
+    str_replace_all(pattern = '"', replacement = '') %>% 
+    str_replace_all(pattern = '`', replacement = '') %>%
+    str_replace_all(pattern = '\'', replacement = '') %>%
+    str_replace_all(pattern = '�', replacement = ' ') %>% 
+    str_replace_all(pattern = '[[:punct:]]', replacement = ' ') %>%
+    str_split(pattern = "\\s+") %>%
+    unlist() %>% as.data.frame() %>% slice(-1) %>% rename(word = '.') -> result
+  return(result)
+}
+
+extract_words_ordered_norename <- function(data) {
+  data %>% as.data.frame %>% select(text) %>% 
+    str_replace_all(pattern = '"', replacement = '') %>% 
+    str_replace_all(pattern = '`', replacement = '') %>%
+    str_replace_all(pattern = '\'', replacement = '') %>%
+    str_replace_all(pattern = '�', replacement = ' ') %>% 
+    str_replace_all(pattern = '[[:punct:]]', replacement = ' ') %>%
+    str_split(pattern = "\\s+") %>%
+    unlist() %>% as.data.frame() %>% slice(-1) -> result
+  return(result)
+}
+
+extract_semantic_words <- function(data) {
+  data %>% extract_words() %>% filter(!(tolower(word) %in% stop_words$word)) -> result
+  return(result)
+}
+
+extract_pure_words <- function(data) {
+  data %>% extract_semantic_words() %>% filter(!(tolower(word) %in% .$word)) -> result
+  return(result)
+}
+
+lesmiserebles <- gutenberg_download(135)
+```
+
+
+
+***
+
+<p dir="RTL">
+۶. ابتدا ترکیبات دوتایی کلماتی که پشت سر هم می آیند را استخراج کنید و سپس نمودار ۳۰ جفت لغت پرتکرار را رسم نمایید.
+</p>
+
+
+```{r Q6, cache=TRUE}
+################################################################################################
+## Q6
+
+extract_word_touples <- function(data) {
+  data %>% extract_words_ordered_norename %>% rename(word = '.') -> words
+  words %>% mutate(next_word = lead(word)) -> result
+  return(result)
+}
+
+lesmiserebles %>% extract_word_touples %>% group_by(word, next_word) %>% summarise(count = n()) %>%
+  arrange(desc(count)) %>% ungroup %>% slice(1:30) %>%
+  hchart(type = 'bar', hcaes(x = paste(word, next_word, sep = ' '), y = count))
+
+```
+
+***
+
+<p dir="RTL">
+۷. جفت کلماتی که با she و یا he آغاز می شوند را استخراج کنید. بیست فعل پرتکراری که زنان و مردان در داستان های دیکنز انجام می دهند را استخراج کنید و نمودار آن را رسم نمایید.
+</p>
+
+
+```{r Q7, cache=TRUE}
+################################################################################################
+## Q7
+
+dickens_romans[[1]] %>% extract_word_touples %>% filter(word %in% c('he', 'He', 'HE')) %>% 
+  select(next_word) %>% table %>% as.data.frame %>% arrange(desc(Freq)) %>% rename(word = '.') -> q7_male_verbs
+
+dickens_romans[[1]] %>% extract_word_touples %>% filter(word %in% c('she', 'She', 'SHE')) %>% 
+  select(next_word) %>% table %>% as.data.frame %>% arrange(desc(Freq)) %>% rename(word = '.') -> q7_female_verbs
+
+
+for (i in 2:length(dickens_romans)) {
+  rbind(
+    q7_male_verbs,
+    dickens_romans[[i]] %>% extract_word_touples %>% filter(word %in% c('he', 'He', 'HE')) %>% 
+      select(next_word) %>% table %>% as.data.frame %>% arrange(desc(Freq)) %>% rename(word = '.')
+  ) -> q7_male_verbs
+  
+  rbind(
+    q7_female_verbs,
+    dickens_romans[[i]] %>% extract_word_touples %>% filter(word %in% c('she', 'She', 'SHE')) %>% 
+      select(next_word) %>% table %>% as.data.frame %>% arrange(desc(Freq)) %>% rename(word = '.')
+  ) -> q7_female_verbs
+}
+
+q7_male_verbs %>% group_by(word) %>% summarise(Freq = sum(Freq)) -> q7_male_verbs
+q7_female_verbs %>% group_by(word) %>% summarise(Freq = sum(Freq)) -> q7_female_verbs
+
+
+trash_verbs = c('has', 'had', 'was', 'is', 'did', 'were', 'would', 'could', 'will', 'must', 'might', 'should',
+                'who', 'no', 'to', 'still', 'I', 'now', 'only', 'in', 'not', 'the', 'can', 'The', 'And', 'you',
+                'also', 'got', 'He', 'It', 'a', 'do', 'You', 'be', 'what', 'never', 'may', 'and', 'does', 'didnt',
+                'dont', 'couldnt', 'then', 'shall', 'ever', 'he', 'really', 'at')
+
+
+q7_male_verbs %>% filter(!word %in% trash_verbs) %>% arrange(desc(Freq)) %>% slice(1:20) %>% 
+  hchart(type = 'bar', hcaes(x = word, y = Freq)) %>% hc_title(text = 'Most freauent verbs for men')
+q7_female_verbs %>% filter(!word %in% trash_verbs) %>% arrange(desc(Freq)) %>% slice(1:20) %>% 
+  hchart(type = 'bar', hcaes(x = word, y = Freq)) %>% hc_title(text = 'Most freauent verbs for women')
+
+```

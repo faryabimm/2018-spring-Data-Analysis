@@ -1,0 +1,175 @@
+---
+title: "Eighth Week: Text Analysis in R - Q2"
+subtitle: "To be, or not to be"
+author: "Mohammadmahdi Faryabi - STD-ID: 93101951"
+date: "`r Sys.time()`"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+<div align="center">
+<img  src="images/dickens1_1.png"  align = 'center'>
+</div>
+
+> <p dir="RTL"> 
+با استفاده از بسته gutenberg داده های لازم را به دست آورید و به سوالات زیر پاسخ دهید.
+</p>
+
+
+```{r Q0, cache=TRUE}
+library(gutenbergr)
+library(readr)
+library(dplyr)
+library(stringr)
+library(tidytext)
+library(highcharter)
+
+
+load('../data/dickens_romans.RData')
+load('../data/shakespeare_romans.RData')
+
+dickens_roman_names <- c(
+  'ThwPickwickPapers',
+  'OliverTwist',
+  'NicholasNickleby',
+  'TheOldCuriosityShop',
+  'BarnabyRudge',
+  'MartinChuzzlewit',
+  'DombeyandSon',
+  'DavidCopperfield',
+  'BleakHouse',
+  'HardTimes',
+  'LittleDorrit',
+  'ATaleofTwoCities',
+  'GreatExpectations',
+  'OurMutualFriend',
+  'TheMysteryofEdwinDrood'
+)
+
+extract_words <- function(data) {
+  data %>% select(text) %>% 
+    str_replace_all(pattern = '"', replacement = '') %>% 
+    str_replace_all(pattern = '`', replacement = '') %>%
+    str_replace_all(pattern = '\'', replacement = '') %>%
+    str_replace_all(pattern = '�', replacement = ' ') %>% 
+    str_replace_all(pattern = '[[:punct:]]', replacement = ' ') %>%
+    str_split(pattern = "\\s+") %>%
+    unlist() %>% table() %>% as.data.frame() %>% slice(-1) -> result
+  colnames(result) <- c('word', 'count')
+  return(result)
+}
+
+extract_words_ordered <- function(data) {
+  data %>% as.data.frame %>% select(text) %>% 
+    str_replace_all(pattern = '"', replacement = '') %>% 
+    str_replace_all(pattern = '`', replacement = '') %>%
+    str_replace_all(pattern = '\'', replacement = '') %>%
+    str_replace_all(pattern = '�', replacement = ' ') %>% 
+    str_replace_all(pattern = '[[:punct:]]', replacement = ' ') %>%
+    str_split(pattern = "\\s+") %>%
+    unlist() %>% as.data.frame() %>% slice(-1) %>% rename(word = '.') -> result
+  return(result)
+}
+
+extract_words_ordered_norename <- function(data) {
+  data %>% as.data.frame %>% select(text) %>% 
+    str_replace_all(pattern = '"', replacement = '') %>% 
+    str_replace_all(pattern = '`', replacement = '') %>%
+    str_replace_all(pattern = '\'', replacement = '') %>%
+    str_replace_all(pattern = '�', replacement = ' ') %>% 
+    str_replace_all(pattern = '[[:punct:]]', replacement = ' ') %>%
+    str_split(pattern = "\\s+") %>%
+    unlist() %>% as.data.frame() %>% slice(-1) -> result
+  return(result)
+}
+
+extract_semantic_words <- function(data) {
+  data %>% extract_words() %>% filter(!(tolower(word) %in% stop_words$word)) -> result
+  return(result)
+}
+
+extract_pure_words <- function(data) {
+  data %>% extract_semantic_words() %>% filter(!(tolower(word) %in% .$word)) -> result
+  return(result)
+}
+```
+
+***
+
+<p dir="RTL">
+۲. ابر لغات ۲۰۰ کلمه پرتکرار در رمان های چارلز دیکنز را رسم نمایید. این کار را با بسته wordcloud2 انجام دهید. برای دانلود می توانید به لینک زیر مراجعه کنید.
+</p>
+
+https://github.com/Lchiffon/wordcloud2
+
+<p dir="RTL">
+ با استفاده از عکسی که در ابتدا متن آمده ابر لغاتی مانند شکل زیر رسم کنید. (راهنمایی: از ورودی figpath در دستور wordcloud2 استفاده نمایید.مثالی در زیر آورده شده است.)
+</p>
+
+<div align="center">
+<img  src="images/tag-word-cloud-Che-Guevara.jpg"  align = 'center'>
+</div>
+
+
+```{r Q3, cache=TRUE}
+################################################################################################
+## Q3
+
+find_book_top5_chars <- function(book, name) {
+  book %>% extract_pure_words %>% arrange(desc(count)) %>% slice(1:5) %>% mutate(book = name)
+}
+
+find_book_top5_counts <- function(book, name) {
+  book %>% extract_pure_words %>% arrange(desc(count)) %>% slice(1:5) %>% mutate(book = name, word = 1:5)
+}
+
+q3_book_top_counts <- dickens_romans[[1]] %>% find_book_top5_counts(dickens_roman_names[1])
+for (i in 2:length(dickens_roman_names)) {
+  rbind(
+    q3_book_top_counts,
+    dickens_romans[[i]] %>% find_book_top5_counts(dickens_roman_names[i])
+  ) -> q3_book_top_counts
+}
+
+
+q3_book_top_chars <- dickens_romans[[1]] %>% find_book_top5_chars(dickens_roman_names[1])
+for (i in 2:length(dickens_roman_names)) {
+  rbind(
+    q3_book_top_chars,
+    dickens_romans[[i]] %>% find_book_top5_chars(dickens_roman_names[i])
+  ) -> q3_book_top_chars
+}
+
+
+q3_book_top_counts %>% hchart(type = 'line', hcaes(x = book, y = count, group = word))
+q3_book_top_counts %>% group_by(book) %>% mutate(tot_words = sum(count)) %>% ungroup() %>%
+  mutate(ratio = count/tot_words) %>% hchart(type = 'line', hcaes(x = book, y = ratio, group = word))
+
+
+draw_top5_char_pie_chart <- function(data, name) {
+  data %>% find_book_top5_chars(name) %>%
+    hchart(type = 'pie', hcaes(x = word, y = count)) %>% hc_title(text = name)
+}
+
+```
+
+```{r}
+dickens_romans[[1]] %>% draw_top5_char_pie_chart(dickens_roman_names[1])
+dickens_romans[[2]] %>% draw_top5_char_pie_chart(dickens_roman_names[2])
+dickens_romans[[3]] %>% draw_top5_char_pie_chart(dickens_roman_names[3])
+dickens_romans[[4]] %>% draw_top5_char_pie_chart(dickens_roman_names[4])
+dickens_romans[[5]] %>% draw_top5_char_pie_chart(dickens_roman_names[5])
+dickens_romans[[6]] %>% draw_top5_char_pie_chart(dickens_roman_names[6])
+dickens_romans[[7]] %>% draw_top5_char_pie_chart(dickens_roman_names[7])
+dickens_romans[[8]] %>% draw_top5_char_pie_chart(dickens_roman_names[8])
+dickens_romans[[9]] %>% draw_top5_char_pie_chart(dickens_roman_names[9])
+dickens_romans[[10]] %>% draw_top5_char_pie_chart(dickens_roman_names[10])
+dickens_romans[[11]] %>% draw_top5_char_pie_chart(dickens_roman_names[11])
+dickens_romans[[12]] %>% draw_top5_char_pie_chart(dickens_roman_names[12])
+dickens_romans[[13]] %>% draw_top5_char_pie_chart(dickens_roman_names[13])
+dickens_romans[[14]] %>% draw_top5_char_pie_chart(dickens_roman_names[14])
+dickens_romans[[15]] %>% draw_top5_char_pie_chart(dickens_roman_names[15])
+
+```

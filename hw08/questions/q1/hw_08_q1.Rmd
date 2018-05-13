@@ -1,0 +1,165 @@
+---
+title: "Eighth Week: Text Analysis in R - Q1"
+subtitle: "To be, or not to be"
+author: "Mohammadmahdi Faryabi - STD-ID: 93101951"
+date: "`r Sys.time()`"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+<div align="center">
+<img  src="images/dickens1_1.png"  align = 'center'>
+</div>
+
+> <p dir="RTL"> 
+با استفاده از بسته gutenberg داده های لازم را به دست آورید و به سوالات زیر پاسخ دهید.
+</p>
+
+
+```{r Q0, cache=TRUE}
+library(gutenbergr)
+library(readr)
+library(dplyr)
+library(stringr)
+library(tidytext)
+library(highcharter)
+
+
+load('../data/dickens_romans.RData')
+load('../data/shakespeare_romans.RData')
+```
+
+***
+
+<p dir="RTL">
+۱. چارلز دیکنز نویسنده معروف انگلیسی بالغ بر چهارده رمان (چهارده و نیم) نوشته است. متن تمامی کتاب های او را دانلود کنید و سپس بیست لغت برتر استفاده شده را به صورت یک نمودار ستونی نمایش دهید. (طبیعتا باید ابتدا متن را پاکسازی کرده و stopping words را حذف نمایید تا به کلماتی که بار معنایی مشخصی منتقل می کنند برسید.)
+</p>
+
+
+```{r Q1, cache=TRUE}
+################################################################################################
+## Q1
+
+gutenberg_authors %>% filter(author == 'Dickens, Charles') %>% .$gutenberg_author_id %>%  as.integer() -> dickens_id
+
+gutenberg_metadata %>% filter(gutenberg_author_id == dickens_id, language == 'en') -> dickens_books_list
+
+# dickens_books <- list()
+# for (i in 1:nrow(dickens_books_list)) {
+#   dickens_books[[i]] <- gutenberg_download(dickens_books_list$gutenberg_id[i])
+#   print(i)
+# }
+# 
+# dickens_books_flat <- bind_rows(dickens_books)
+# write.csv(dickens_books_flat, file = 'dicken_books.csv')
+
+# dickens_romans <- list()
+dickens_roman_names <- c(
+  'ThwPickwickPapers',
+  'OliverTwist',
+  'NicholasNickleby',
+  'TheOldCuriosityShop',
+  'BarnabyRudge',
+  'MartinChuzzlewit',
+  'DombeyandSon',
+  'DavidCopperfield',
+  'BleakHouse',
+  'HardTimes',
+  'LittleDorrit',
+  'ATaleofTwoCities',
+  'GreatExpectations',
+  'OurMutualFriend',
+  'TheMysteryofEdwinDrood'
+)
+# dickens_romans[[1]] <- gutenberg_download(580)
+# dickens_romans[[2]] <- gutenberg_download(730)
+# dickens_romans[[3]] <- gutenberg_download(967)
+# dickens_romans[[4]] <- gutenberg_download(700)
+# dickens_romans[[5]] <- gutenberg_download(917)
+# dickens_romans[[6]] <- gutenberg_download(968)
+# dickens_romans[[7]] <- gutenberg_download(821)
+# dickens_romans[[8]] <- gutenberg_download(766)
+# dickens_romans[[9]] <- gutenberg_download(1023)
+# dickens_romans[[10]] <- gutenberg_download(786)
+# dickens_romans[[11]] <- gutenberg_download(963)
+# dickens_romans[[12]] <- gutenberg_download(98)
+# dickens_romans[[13]] <- gutenberg_download(1400)
+# dickens_romans[[14]] <- gutenberg_download(883)
+# dickens_romans[[15]] <-gutenberg_download(564)
+# save(dickens_romans, file = 'Desktop/data/dickens_romans.RData')
+
+
+# thanks to 'ostad' Arayn Tajmiri!
+
+# all_books <- read_csv('Desktop/data/dicken_books.csv')
+
+# all_books %>% View()
+
+
+extract_words <- function(data) {
+  data %>% select(text) %>% 
+    str_replace_all(pattern = '"', replacement = '') %>% 
+    str_replace_all(pattern = '`', replacement = '') %>%
+    str_replace_all(pattern = '\'', replacement = '') %>%
+    str_replace_all(pattern = '�', replacement = ' ') %>% 
+    str_replace_all(pattern = '[[:punct:]]', replacement = ' ') %>%
+    str_split(pattern = "\\s+") %>%
+    unlist() %>% table() %>% as.data.frame() %>% slice(-1) -> result
+  colnames(result) <- c('word', 'count')
+  return(result)
+}
+
+extract_words_ordered <- function(data) {
+  data %>% as.data.frame %>% select(text) %>% 
+    str_replace_all(pattern = '"', replacement = '') %>% 
+    str_replace_all(pattern = '`', replacement = '') %>%
+    str_replace_all(pattern = '\'', replacement = '') %>%
+    str_replace_all(pattern = '�', replacement = ' ') %>% 
+    str_replace_all(pattern = '[[:punct:]]', replacement = ' ') %>%
+    str_split(pattern = "\\s+") %>%
+    unlist() %>% as.data.frame() %>% slice(-1) %>% rename(word = '.') -> result
+  return(result)
+}
+
+extract_words_ordered_norename <- function(data) {
+  data %>% as.data.frame %>% select(text) %>% 
+    str_replace_all(pattern = '"', replacement = '') %>% 
+    str_replace_all(pattern = '`', replacement = '') %>%
+    str_replace_all(pattern = '\'', replacement = '') %>%
+    str_replace_all(pattern = '�', replacement = ' ') %>% 
+    str_replace_all(pattern = '[[:punct:]]', replacement = ' ') %>%
+    str_split(pattern = "\\s+") %>%
+    unlist() %>% as.data.frame() %>% slice(-1) -> result
+  return(result)
+}
+
+
+
+extract_semantic_words <- function(data) {
+  data %>% extract_words() %>% filter(!(tolower(word) %in% stop_words$word)) -> result
+  return(result)
+}
+
+extract_pure_words <- function(data) {
+  data %>% extract_semantic_words() %>% filter(!(tolower(word) %in% .$word)) -> result
+  return(result)
+}
+
+q1_most_used_words <- dickens_romans[[1]] %>% extract_semantic_words
+
+for (i in 2:length(dickens_roman_names)) {
+  rbind(
+    q1_most_used_words,
+    dickens_romans[[i]] %>% extract_semantic_words
+  ) -> q1_most_used_words
+}
+
+q1_most_used_words %>% group_by(word) %>% summarise(count = sum(count)) %>% arrange(desc(count)) -> q1_most_used_words
+q1_most_20 <- q1_most_used_words %>% slice(1:20)
+q1_most_20 %>% hchart(type = 'column', hcaes(x = word, y = count))
+
+
+```
+
