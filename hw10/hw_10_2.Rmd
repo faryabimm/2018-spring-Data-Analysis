@@ -1,0 +1,187 @@
+---
+title: "Cluster Analysis - Part 2"
+subtitle: "WDI Indicators"
+author: "Mohammadmahdi Faryabi - STD-ID: 93101951"
+date: "`r Sys.time()`"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+<div align="center">
+<img  src="images/best_hans_talks_1200x627.jpg"  align = 'center'>
+</div>
+
+> <p dir="RTL"> 
+با توجه به داده بانک جهانی به سوالات زیر پاسخ دهید. برای استفاده از داده از سه فایل زیر استفاده نمایید.
+داده نام کشورها: WDICountry
+داده نام سری های زمانی: WDISeries
+داده کل: WDIData
+در صورتی که داده را در اختیار ندارید می توانید از بسته WDI استفاده نموده و داده های مورد نظر را استخراج نمایید.
+</p>
+
+***
+
+><p>
+gathering required data and loading required packages...
+</p>
+
+```{r Q0, cache=TRUE}
+library(WDI)
+library(dplyr)
+library(readr)
+library(highcharter)
+library(tidyr)
+
+country_series <- read_csv('../../WDI_csv/WDICountry-Series.csv')
+country <- read_csv('../../WDI_csv/WDICountry.csv')
+data <- read_csv('../../WDI_csv/WDIData.csv')
+footnote <- read_csv('../../WDI_csv/WDIFootNote.csv')
+series_time <- read_csv('../../WDI_csv/WDISeries-Time.csv')
+series <- read_csv('../../WDI_csv/WDISeries.csv')
+```
+
+<p dir="RTL">
+۵. رشد اقتصادی ایران را با کشورهای دیگر در طول ۲۰ سال گذشته بر حسب بیست شاخص های اقتصادی مهم مانند تولید ناخالص ملی، تورم و … ارزیابی کنید! (برای هر شاخص از تصویرسازی استفاده کنید.)
+</p>
+
+><p>
+required information is provided in separate plots.
+</p>
+
+```{r Q5, cache=TRUE}
+################################################################################
+#### Q5
+
+
+compare_iran_with_others <- function (indicator_code, indicator_name) {
+  data %>% filter(`Indicator Code` == indicator_code) %>%
+    gather(key = 'year', value = 'lexp', `1960`:`2016`) %>%
+    select(`Country Name`, `Country Code`, year, lexp) %>% .[complete.cases(.),] -> all_country_data
+  
+  
+  iran_data <- all_country_data %>% filter(`Country Code` == 'IRN')
+  
+  hcboxplot(x = all_country_data$lexp, var = all_country_data$year, outliers = FALSE) %>% hc_chart(type = "column") %>%
+    hc_add_series(type = 'line', iran_data, color = 'red', hcaes(x = year, y = lexp)) %>% 
+    hc_yAxis(title = list(text = indicator_name)) %>% 
+    hc_xAxis(title = list(text = 'Year'))
+}
+
+compare_iran_with_others('NE.EXP.GNFS.ZS', 'Exports of goods and services (% of GDP)')
+compare_iran_with_others('NE.IMP.GNFS.ZS', 'Imports of goods and services (% of GDP)')
+compare_iran_with_others('FP.CPI.TOTL.ZG', 'Inflation, consumer prices (annual %)')
+compare_iran_with_others('NY.GDP.DEFL.KD.ZG', 'Inflation, GDP deflator (annual %)')
+compare_iran_with_others('MS.MIL.MPRT.KD', 'Arms imports (SIPRI trend indicator values)')
+compare_iran_with_others('MS.MIL.XPRT.KD', 'Arms exports (SIPRI trend indicator values)')
+compare_iran_with_others('TX.MNF.TECH.ZS.UN', 'Medium and high-tech exports (% manufactured exports)')
+compare_iran_with_others('FI.RES.TOTL.CD', 'Total reserves (includes gold, current US$)')
+compare_iran_with_others('GC.TAX.TOTL.GD.ZS', 'Tax revenue (% of GDP)')
+compare_iran_with_others('GC.TAX.EXPT.ZS', 'Taxes on exports (% of tax revenue)')
+compare_iran_with_others('BX.KLT.DINV.CD.WD', 'Foreign direct investment, net inflows (BoP, current US$)')
+compare_iran_with_others('BX.KLT.DINV.WD.GD.ZS', 'Foreign direct investment, net inflows (% of GDP)')
+compare_iran_with_others('NY.GDP.MKTP.KD', 'GDP (constant 2010 US$)')
+compare_iran_with_others('NY.GDP.MKTP.KD.ZG', 'GDP growth (annual %)')
+compare_iran_with_others('SI.POV.GAPS', 'Poverty gap at $1.90 a day (2011 PPP) (%)')
+compare_iran_with_others('SI.POV.LMIC.GP', 'Poverty gap at $3.20 a day (2011 PPP) (%)')
+compare_iran_with_others('SI.POV.UMIC.GP', 'Poverty gap at $5.50 a day (2011 PPP) (%)')
+compare_iran_with_others('BN.CAB.XOKA.GD.ZS', 'Current account balance (% of GDP)')
+compare_iran_with_others('NV.AGR.TOTL.ZS', 'Agriculture, value added (% of GDP)')
+compare_iran_with_others('SH.XPD.CHEX.GD.ZS', 'Current health expenditure (% of GDP)')
+compare_iran_with_others('SE.XPD.PRIM.PC.ZS', 'Government expenditure per student, primary (% of GDP per capita)')
+compare_iran_with_others('NV.IND.TOTL.ZS', 'Industry, value added (% of GDP)')
+
+```
+
+***
+
+<p dir="RTL">
+۶. در قسمت قبل با استفاده از روش خوشه بندی k-means داده ها را به سه دسته تقسیم کنید. ایران در کدام دسته می گنجد؟ (پیش از خوشه بندی طبیعتا داده را باید پاکسازی و استاندارد سازی نمایید.)
+</p>
+
+><p>
+Iran is in group 2 of countries with coutries like Indonesia, Jamaica, Iraq, Dominica, Brazil, Afghanistan, Argentina and Russian Federation.
+</p>
+
+```{r Q6, cache=TRUE}
+################################################################################
+#### Q6
+
+q5_series <- c('NE.EXP.GNFS.ZS', 'NE.IMP.GNFS.ZS', 'FP.CPI.TOTL.ZG', 'NY.GDP.DEFL.KD.ZG',
+               'MS.MIL.MPRT.KD', 'MS.MIL.XPRT.KD', 'TX.MNF.TECH.ZS.UN', 'FI.RES.TOTL.CD',
+               'GC.TAX.TOTL.GD.ZS', 'GC.TAX.EXPT.ZS', 'BX.KLT.DINV.CD.WD', 'BX.KLT.DINV.WD.GD',
+               'NY.GDP.MKTP.KD', 'NY.GDP.MKTP.KD.ZG', 'SI.POV.GAPS', 'SI.POV.LMIC.GP',
+               'SI.POV.UMIC.GP', 'BN.CAB.XOKA.GD.ZS', 'NV.AGR.TOTL.ZS', 'SH.XPD.CHEX.GD.ZS',
+               'GC.DOD.TOTL.GD.ZS', 'SE.XPD.PRIM.PC.ZS', 'NV.IND.TOTL.ZS')
+
+normalize <- function(column) {
+  result <- (column - mean(column, na.rm = TRUE)) / sd(column, na.rm = TRUE)
+  return(result)
+}
+
+data %>% select(-X63) %>% filter(`Indicator Code` %in% q5_series) %>%
+  gather(key = 'year', value = 'value', `1960`:`2017`) %>% 
+  group_by(`Indicator Code`) %>% mutate(value = normalize(value)) %>% 
+  ungroup %>% group_by(`Country Name`, `Country Code`, `Indicator Code`) %>% 
+  summarise(mean_value = mean(value, na.rm = TRUE)) -> q6_data
+
+q6_data %>% spread(key = `Indicator Code`, value = mean_value) -> q6_data
+
+q6_data %>% select(-GC.DOD.TOTL.GD.ZS) %>% ungroup -> q6_data
+
+# filling NAs with mean of the column
+
+for (i in 1:ncol(q6_data)) {
+  if ((q6_data[which(is.na(q6_data[i])),i] %>% nrow) > 0) {
+    q6_data[which(is.na(q6_data[i])),i] <- q6_data[i] %>% na.omit %>% unlist %>% mean
+  }
+}
+
+q6_data %>% select(BN.CAB.XOKA.GD.ZS:TX.MNF.TECH.ZS.UN) %>% kmeans(centers = 3) -> kmeans_data
+
+cbind(
+  q6_data %>% select(`Country Name`, `Country Code`),
+  cluster = kmeans_data$cluster
+  ) -> q6_table_data
+
+
+library(knitr)
+
+kable(q6_table_data %>% arrange(cluster))
+
+```
+
+***
+
+<p dir="RTL">
+۷. به وسیله تحلیل مولفه اصلی بعد داده رو به دو کاهش دهید سپس خوشه های به دست آمده در قسمت قبل را بر روی آن نمایش دهید. آیا عملکرد روش خوشه بندی شما مطلوب بوده است؟
+</p>
+
+><p>
+The clustering performed by algorithem is close to what i would expect based of countries' financial situations.
+so I think the algorithem has done well!
+</p>
+
+```{r Q7, cache=TRUE}
+################################################################################
+#### Q7
+
+all_data <- q6_data %>% select(-`Country Name`, -`Country Code`)
+all_data %>% prcomp -> q7_pca
+biplot(q7_pca, cex = 0.8)
+
+
+chosen_components <- 1:2
+compact_data <- q7_pca$x[,chosen_components]
+
+# feature_vector <- q7_pca$rotation[,chosen_components]
+# compact_data <- t(feature_vector) %*% t(all_data)
+# compact_result <- t(feature_vector %*% compact_data)
+
+library(ggbiplot)
+
+compact_data %>% prcomp %>% ggbiplot(obs.scale = 1, var.scale = 1,
+         groups = kmeans_data$cluster, ellipse = TRUE, labels = q6_data$`Country Name`, labels.size = 1)
+
+```

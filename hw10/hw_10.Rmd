@@ -1,0 +1,171 @@
+---
+title: "Cluster Analysis - Part 1"
+subtitle: "WDI Indicators"
+author: "Mohammadmahdi Faryabi - STD-ID: 93101951"
+date: "`r Sys.time()`"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+<div align="center">
+<img  src="images/best_hans_talks_1200x627.jpg"  align = 'center'>
+</div>
+
+> <p dir="RTL"> 
+با توجه به داده بانک جهانی به سوالات زیر پاسخ دهید. برای استفاده از داده از سه فایل زیر استفاده نمایید.
+داده نام کشورها: WDICountry
+داده نام سری های زمانی: WDISeries
+داده کل: WDIData
+در صورتی که داده را در اختیار ندارید می توانید از بسته WDI استفاده نموده و داده های مورد نظر را استخراج نمایید.
+</p>
+
+***
+
+><p>
+gathering required data and loading required packages...
+</p>
+
+```{r Q0, cache=TRUE}
+library(WDI)
+library(dplyr)
+library(readr)
+library(highcharter)
+library(tidyr)
+
+country_series <- read_csv('../../WDI_csv/WDICountry-Series.csv')
+country <- read_csv('../../WDI_csv/WDICountry.csv')
+data <- read_csv('../../WDI_csv/WDIData.csv')
+footnote <- read_csv('../../WDI_csv/WDIFootNote.csv')
+series_time <- read_csv('../../WDI_csv/WDISeries-Time.csv')
+series <- read_csv('../../WDI_csv/WDISeries.csv')
+```
+
+<p dir="RTL">
+۱. ده کشور فقیر دنیا را بیابید. نمودار درآمد روزانه آنها را رسم کنید. چند درصد از اعضای این کشورها زیر خط فقر هستند؟ متوسط عمر در این کشورها چقدر است؟
+</p>
+
+><p>
+required information is provided as interactive diagrams.
+</p>
+
+```{r Q1, cache=TRUE}
+################################################################################
+#### Q1
+
+days_per_year <- 365
+
+data %>% filter(`Indicator Code` == 'NY.GDP.PCAP.CD') %>%
+  select('Country Name', 'Country Code', gdp_pcap = '2016') %>%
+  arrange(gdp_pcap) %>% .[complete.cases(.),] %>% slice(1:10) -> q1_poor_data
+
+q1_poor_data %>% hchart(type = 'column', hcaes(x = `Country Name`, y = gdp_pcap/days_per_year)) %>% 
+  hc_yAxis(title = list(text = 'GDP per capita per day'))
+  
+q1_poor_data %>% .$`Country Code` %>% as.vector -> poor_country_codes
+
+data %>% filter(`Indicator Code` == 'SI.POV.NAHC', `Country Code` %in% poor_country_codes) %>%
+  gather(key = 'year', value = 'pbpl', `2000`:`2016`) %>%
+  select(`Country Name`, `Country Code`, year, pbpl) %>%
+  group_by(`Country Name`, `Country Code`) %>% summarise(pbpl_mean = mean(pbpl, na.rm = TRUE)) %>% 
+  arrange(pbpl_mean) %>% hchart(type = 'column', color = 'red', hcaes(x = `Country Name`, y = pbpl_mean)) %>%
+  hc_yAxis(title = list(text = 'Average population percentage below national powerty line in 21st century'))
+
+
+data %>% filter(`Indicator Code` == 'SP.DYN.LE00.IN', `Country Code` %in% poor_country_codes) %>% 
+  gather(key = 'year', value = 'pbpl', `2000`:`2016`) %>% select(`Country Name`, `Country Code`, year, pbpl) %>%
+  group_by(`Country Name`, `Country Code`) %>% summarise(pbpl_mean = mean(pbpl, na.rm = TRUE)) %>% 
+  arrange(pbpl_mean) %>% hchart(type = 'column', color = 'pink', hcaes(x = `Country Name`, y = pbpl_mean)) %>%
+  hc_yAxis(title = list(text = 'Average Life Expectancy in 21st century'))
+
+```
+
+***
+
+<p dir="RTL">
+۲. تراژدی روآندا: بر اساس داده های امید به زندگی ابتدا نمودار سالانه نمودار جعبه ایی امید به زندگی کشورها را رسم نمایید(در یک نمودار!). سپس سری زمانی امید به زندگی روآندا را به آن اضافه کنید. چه می بینید؟ چند میلیون نفر کشته شدند؟
+</p>
+
+><p>
+From the diagrams we can see that nearly 1.2 milion people were killed, as en extra task, we've generated a regression model for predictign future population of rwanda based on the data before the tragedy. with subtracting the predictin data from this model and actual data we can see how much impact this tragedy had on rwanda's population. (1.3 milion people).
+</p>
+
+```{r Q2, cache=TRUE}
+################################################################################
+#### Q2
+
+data %>% filter(`Indicator Code` == 'SP.DYN.LE00.IN') %>%
+  gather(key = 'year', value = 'lexp', `1960`:`2016`) %>%
+  select(`Country Name`, `Country Code`, year, lexp) -> q2_data
+
+
+rwanda_data <- q2_data %>% filter(`Country Name` == 'Rwanda')
+
+hcboxplot(x = q2_data$lexp, var = q2_data$year, outliers = FALSE) %>% hc_chart(type = "column") %>%
+  hc_add_series(type = 'line', rwanda_data, color = 'red', hcaes(x = year, y = lexp)) %>% 
+  hc_yAxis(title = list(text = 'Life Expectancy in years')) %>% 
+  hc_xAxis(title = list(text = 'Year'))
+
+
+data %>% filter(`Indicator Code` == 'SP.POP.TOTL', `Country Name` == 'Rwanda') %>%
+  gather(key = 'year', value = 'population', `1960`:`2016`) %>% select(year, population) -> rwanda_population_data
+
+rwanda_population_data %>% hchart(type = 'line', color = 'darkblue', hcaes(x = year, y = population))
+
+
+
+regression_model <- lm(population~year, data = rwanda_population_data %>%
+                         filter(year <= 1994) %>% mutate(year = as.numeric(year)))
+
+df <- data.frame(year = 1960:2016)
+cbind(
+  df,
+  predict.lm(regression_model, df, interval = 'prediction') %>% as.data.frame %>% select(population_pred = fit),
+  population = rwanda_population_data$population
+) %>% mutate(pop_diff = population_pred - population) %>% hchart(type = 'line', hcaes(x = year, y = pop_diff))
+
+```
+
+***
+
+<p dir="RTL">
+۳. نمودار امید به زندگی و هزینه های بهداشتی را رسم کنید. چه نتیجه ایی می گیرید؟
+</p>
+
+><p>
+conclusion: life expectency increases by a huge amount with up to 1000$ of health expenditure per capita.
+after that the increase in health expectency with increase in health expenditure is minimal.
+</p>
+
+```{r Q3, cache=TRUE}
+################################################################################
+#### Q3
+
+data %>% filter(`Indicator Code` %in% c('SP.DYN.LE00.IN', 'SH.XPD.CHEX.PC.CD')) %>%
+  gather(key = 'year', value = 'value', `1960`:`2016`) %>% select(-'X63', -'2017', -'Indicator Name') %>% 
+  spread(key = `Indicator Code`, value = value) %>% .[complete.cases(.),] -> q3_data
+
+q3_data %>% hchart(type = 'scatter', hcaes(y = SP.DYN.LE00.IN, x = SH.XPD.CHEX.PC.CD, group = `Country Name`, alpha = 0.3))
+
+```
+
+***
+
+<p dir="RTL">
+۴. آیا قدرت خرید خانواده های ایرانی در ۵۰ سال اخیر افزایش یافته است؟ برای این کار از داده های اقتصادی خانوار استفاده کنید.
+</p>
+
+><p>
+the purchasing power has increased but in my idea increase in purchasing power is inevidable and trivial!. the rate of increase in purchasing power and sometimes the purchasing poser itself has increased due to world sanctions after iran's nuclear case.
+</p>
+
+```{r Q4, cache=TRUE}
+################################################################################
+#### Q4
+
+data %>% filter(`Indicator Code` == 'NY.GDP.PCAP.PP.CD', `Country Code` == 'IRN') %>%
+  gather(key = 'year', value = 'purchase power', `1960`:`2016`) %>%
+  select(year, `purchase power`) %>% .[complete.cases(.),] %>% 
+  hchart(type = 'line', color = 'red', hcaes(x = year, y = `purchase power`))
+```

@@ -1,0 +1,347 @@
+---
+title: "Create Map"
+subtitle: "Earthquake Analysis"
+author: "Mohammadmahdi Faryabi - STD-ID: 93101951"
+date: "`r Sys.time()`"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+<div align="center">
+<img  src="images/eqs003-001-2.png"  align = 'center'>
+</div>
+
+> <p dir="RTL"> 
+با استفاده از داده های زلزله ها در ایران و جهان به سوالات زیر پاسخ دهید.
+</p>
+
+><p>
+loading data and required packages...
+</p>
+
+```{r Q0, cache=TRUE}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(highcharter)
+library(plotly)
+library(stringr)
+
+
+hist_data <- read_rds('../../data/historical_web_data_26112015.rds')
+disaster <- read_delim("../../data/disaster.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
+iran_eqrthquake<- read_rds('../../data/iran_earthquake.rds')
+myMap = read_rds("../../data/Tehrn_map_6.rds")
+worldwide <- read_csv('../../data/worldwide.csv')
+```
+
+***
+
+<p dir="RTL">
+۱. با استفاده از داده های
+historical_web_data_26112015.rds 
+و استفاده از نمودار پراکنش سه بعدی بسته plotly نمودار طول، عرض و عمق زلزله ها را رسم نمایید. علاوه بر آن بزرگی هر نقطه را برابر بزرگی زمین لرزه قرار دهید.
+</p>
+
+```{r Q1, cache=TRUE}
+################################################################################################
+## Q1
+
+hist_data %>% plot_ly(type = 'scatter3d', mode='markers', x = ~Latitude, y = ~Longitude, z = ~-Depth, size = ~Magnitude,
+                      marker = list(symbol = 'circle', sizemode = 'diameter'), sizes = c(1,20),
+                      text = ~paste('Time:', Time, '<br>Province:', Province, '<br>City:', City,'<br>Magnitude:', Magnitude)) %>%
+                              layout(title = 'Iran Earthquakes Data Visualization',
+                                     scene = list(xaxis = list(title = 'Lattitude'),
+                                                  yaxis = list(title = 'Longitude'),
+                                                  zaxis = list(title = 'Depth')
+                                                  ),
+                                        paper_bgcolor = 'rgb(243, 243, 243)',
+                                        plot_bgcolor = 'rgb(243, 243, 243)'
+                                     )
+```
+
+***
+
+<p dir="RTL">
+۲. پویانمایی سونامی های تاریخی را بر حسب شدت بر روی نقشه زمین رسم نمایید.(از داده زلزله های بزرگ استفاده نمایید.)
+</p>
+
+```{r Q2, cache=TRUE}
+################################################################################################
+## Q2
+
+disaster %>% filter(FLAG_TSUNAMI == 'Tsu') %>%
+  select(year = YEAR, mag = EQ_PRIMARY, lat = LATITUDE, lng = LONGITUDE) -> q2_data
+
+min_year <- min(q2_data$year, na.rm = TRUE)
+max_year <- max(q2_data$year, na.rm = TRUE)
+
+q2_data_acc <- q2_data %>% filter(year == min_year)
+for (year_iter in (min_year+1):max_year) {
+  q2_data_acc <- rbind(
+    q2_data_acc,
+    q2_data_acc %>% filter(year == year_iter-1) %>% mutate(year = year_iter),
+    q2_data %>% filter(year == year_iter)
+  )
+}
+
+
+map_data("world") %>%
+  plot_geo(locationmode = 'USA-states') %>%
+  add_markers(size = ~mag, x = ~lng, y = ~lat, data = q2_data, frame = ~year) %>% 
+  animation_opts(
+    frame = 100, 
+    transition = 0, 
+    redraw = FALSE
+  ) %>%
+  animation_slider(
+    hide = T
+  ) %>%
+  animation_button(
+    x = 1, xanchor = "right", y = 0, yanchor = "bottom"
+  )
+```
+
+***
+
+<p dir="RTL">
+۳. نمودار چگالی دو بعدی زلزله های تاریخی ایران را رسم کنید.( از داده iran_earthquake.rds و لایه stat_density_2d استفاده نمایید).
+</p>
+
+```{r Q3, cache=TRUE}
+################################################################################################
+## Q3
+
+library(ggmap)
+
+
+iran_eqrthquake$Latitude = as.numeric(iran_eqrthquake$Lat)
+iran_eqrthquake$Longitude = as.numeric(iran_eqrthquake$Long)
+ggmap(myMap) + geom_point(aes(x = Long, y = Lat), data = iran_eqrthquake, alpha = 0.5, size = 0.2) +
+  stat_density_2d(aes(x = Long, y = Lat), data = iran_eqrthquake)
+
+```
+
+***
+
+<p dir="RTL">
+۴. احتمال اینکه در ایران در پنج سال آینده زلزله به بزرگی هفت ریشتر رخ دهد را محاسبه کنید. (از احتمال شرطی استفاده کنید.)
+</p>
+
+```{r Q4, cache=TRUE}
+################################################################################################
+## Q4
+
+iran_eqrthquake %>% select(OriginTime, Mag) -> q4_data
+
+q4_data %>% mutate(year = format(OriginTime,'%Y'), month = format(OriginTime,'%m')) %>% filter(year > 2000) %>% 
+  mutate(month_count = (year %>% as.integer - 2006) * 12 + month %>% as.integer) %>% select(-year, -month) %>% 
+  select(-OriginTime) %>% mutate(disaster = Mag >= 7) %>% group_by(month_count) %>% summarise(disaster = any(disaster)) %>% 
+  ungroup %>% group_by(disaster) %>% summarise(frequency = n()) -> q4_disaster_prob
+
+
+false <- q4_disaster_prob %>% filter(disaster == FALSE) %>% .$frequency
+true <- q4_disaster_prob %>% filter(disaster == TRUE) %>% .$frequency
+prob <- true / (true + false)
+
+# next 5 years is 60 months we calculate probablility that no earthquake with Mag > 7 would happen in next 60 months.
+
+final_prob_not <- (1 - prob) ^ 60
+
+# the the probabiliry that in upcomming 60 months there is at least one earthquake with Mag > 7 is:
+
+final_prob <- 1 - final_prob_not
+final_prob %>% print
+
+# of course this value has no significat meaning asd is this large because i've selected my baskets as months,
+# selecting daily baskets would result in a much smaller number
+# at last the calculated probability would pretty much dedpend on our definition of the question.
+
+```
+
+
+***
+
+<p dir="RTL">
+۵. بر اساس داده های زلزله های بزرگ ابتدا تعداد و متوسط کشته زلزله ها را بر حسب کشور استخراج نمایید. سپس نمودار گرمایی تعداد کشته ها را بر روی کره زمین رسم نمایید.(مانند مثال زیر!)
+</p>
+
+<div align="center">
+<img  src="images/jvector.png"  align = 'center'>
+</div>
+
+```{r Q5, cache=TRUE}
+################################################################################################
+## Q5
+
+disaster %>% select(country = COUNTRY, deaths = DEATHS) %>% group_by(country) %>%
+  summarise(tot_deaths = sum(deaths, na.rm = TRUE), mean_deaths = mean(deaths, na.rm = TRUE)) -> q5_data
+
+
+library(rworldmap)
+
+matched <- joinCountryData2Map(q5_data %>% select(country, value = tot_deaths), joinCode="NAME", nameJoinColumn="country")
+mapCountryData(matched, nameColumnToPlot="value", mapTitle="Total deaths in earthquakes", catMethod = "quantiles", colourPalette = "heat")
+
+```
+
+***
+
+<p dir="RTL">
+۶. با استفاده از داده لرزه های بزرگ و به وسیله طول، عرض، شدت، عمق مدلی برای پیش بینی تعداد کشته های زلزله بیابید.
+</p>
+
+```{r Q6, cache=TRUE}
+################################################################################################
+## Q6
+
+disaster %>%
+  select(lat = LATITUDE, lng = LONGITUDE, mag = EQ_PRIMARY, depth = FOCAL_DEPTH, deaths = TOTAL_DEATHS) %>%
+  .[complete.cases(.),] -> q6_data
+
+library(h2o)
+
+glm(deaths~., data = q6_data, family = gaussian(link = 'identity')) %>% summary.glm()
+
+```
+
+***
+
+<p dir="RTL">
+۷. با استفاده از داده worldwide.csv به چند سوال زیر پاسخ دهید. تحقیق کنید آیا می توان از پیش لرزه، زلزله اصلی را پیش بینی کرد؟
+</p>
+
+```{r Q7, cache=TRUE}
+################################################################################################
+## Q7
+
+find_place <- function(string) {
+  tmp <- gregexpr(',', string)
+  start_index <- tmp[[length(string)]][1] + 2
+  result <- substr(string, start_index, nchar(string))
+  return(result)
+}
+
+q7_data <- worldwide
+q7_data$place <- q7_data$place %>% sapply(find_place) %>% str_replace(., regex('region$', ignore_case = TRUE), '') %>% 
+  str_replace(., regex('of the [^\\s]* coast of', ignore_case = TRUE), '') %>%
+  str_replace(., regex('[^\\s]* of (the)?', ignore_case = TRUE), '') %>%
+  str_replace(., regex('.* of', ignore_case = TRUE), '') %>%
+  str_replace(., regex('^off the ', ignore_case = TRUE), '') %>%
+  str_replace(., regex('islands?$', ignore_case = TRUE), '') %>%
+  str_trim(., side = 'both') %>% tolower(.)
+
+q7_data %>% select(place, time, mag) %>% mutate(time = time %>% as.integer) -> q7_data
+q7_data %>% arrange(place, time) -> q7_data
+q7_data$time_diff <- q7_data$time - (q7_data$time %>% lag)
+
+
+# according to wikipedia there is no currently known model for matching pre earthquakes to main earthquakes
+# for example its proposed that earthquake of indonesia in 2002 was a pre earthquake for earthquake and tsunami
+# in indian oscean in 2004!
+# for the sake of this question, we consider a chain of earth rattles as a pre-main-post earthquake chain if
+# time difference between no pair of them is more than 5 days.
+
+
+q7_data %>% mutate(new_chain = time_diff > 5*24*3600) -> q7_data
+q7_data$new_chain[1] <- FALSE
+
+q7_data %>% mutate(chain_number = cumsum(new_chain)) %>% select(-new_chain, -time_diff) -> q7_ready_data
+
+q7_ready_data %>% group_by(chain_number) %>% summarise(max_rank = which.max(mag), chain_lenght = n()) %>% 
+  mutate(max_rel_pos = max_rank/chain_lenght) -> q7_ready_data_summarised
+
+hchart(density(q7_ready_data_summarised$max_rel_pos), type = 'area', color = "#B71C1C", name='Distribution of main earthquake position in chain')
+
+hchart(density(q7_ready_data_summarised$chain_lenght), type = 'area', color = "#3BD641", name='Distribution of chain length')
+hchart(density(q7_ready_data_summarised %>% filter(chain_lenght < 620) %>% .$chain_lenght), type = 'area', color = "#3BD641", name='Distribution of chain length')
+hchart(density(q7_ready_data_summarised %>% filter(chain_lenght < 20) %>% .$chain_lenght), type = 'area', color = "#3BD641", name='Distribution of chain length')
+
+# as we can see with the really strong assumption that the consecutive durations of a chain are not longer than
+# 5 days, we can see that for most of the chains, the biggest quake is the last one,
+# but there is no clear understanding of how long a chain would actually be!
+# perhaps with more information and a complex learnging model we can overcome this and predict chain length but
+# the strong assumption we made in the first place makes it unachievable to predict the main quake from pre ones.
+
+```
+
+***
+
+<p dir="RTL">
+۸. گزاره " آیا شدت زلزله به عمق آن بستگی دارد" را تحقیق کنید؟ (طبیعتا از آزمون فرض باید استفاده کنید.)
+</p>
+
+><p>
+both correlation test and independence test show that this two are correlated and dependent.
+</p>
+
+```{r Q8, cache=TRUE}
+################################################################################################
+## Q8
+
+worldwide %>% select(depth, mag) %>% .[complete.cases(.),] %>% filter(depth >= 0) -> q8_data
+chisq.test(q8_data)
+cor.test(q8_data$depth, q8_data$mag, method = 'spearm')
+
+```
+
+***
+
+<p dir="RTL"> 
+۹. میانگین سالانه زلزله ها را بر حسب کشور به دست آورید. آیا میتوان دلیلی در تایید یا رد تئوری هارپ ارائه کرد.
+</p>
+
+```{r Q9, cache=TRUE}
+################################################################################################
+## Q9
+
+q9_data <- worldwide
+q9_data$place <- q9_data$place %>% sapply(find_place) %>% str_replace(., regex('region$', ignore_case = TRUE), '') %>% 
+  str_replace(., regex('of the [^\\s]* coast of', ignore_case = TRUE), '') %>%
+  str_replace(., regex('[^\\s]* of (the)?', ignore_case = TRUE), '') %>%
+  str_replace(., regex('.* of', ignore_case = TRUE), '') %>%
+  str_replace(., regex('^off the ', ignore_case = TRUE), '') %>%
+  str_replace(., regex('islands?$', ignore_case = TRUE), '') %>%
+  str_trim(., side = 'both') %>% tolower(.)
+
+q9_data %>% mutate(year = format(time, '%Y') %>% as.integer) -> q9_data
+q9_data %>% select(year, place, mag) %>% group_by(place) %>%
+  summarise(count = n(), mean_mag = mean(mag, na.rm = TRUE)) %>% arrange(desc(count)) %>% ungroup %>%
+  slice(1:5) -> q9_plot_data
+
+hchart(q9_plot_data, type = 'column', hcaes(x = place, y = count, color = mean_mag))
+
+
+q9_data %>% select(year, place, mag) %>%
+  filter(place %in% c('alaska', 'indonesia', 'oklahama', 'japan', 'puerto rico')) %>% group_by(place, year) %>%
+  summarise(count = n(), mean_mag = mean(mag, na.rm = TRUE)) %>% arrange(desc(count)) %>% 
+  hchart(type = 'column', hcaes(x = place, y = count, group = year))
+
+
+# harp project base is located in alaska! :D but alaska has always many and some had big earthquakes.
+# one cannot simply make a conclusion out of this.
+```
+
+***
+
+<p dir="RTL"> 
+۱۰. سه حقیقت جالب در مورد زلزله بیابید.
+</p>
+
+```{r Q10, cache=TRUE}
+# the pocture of earth crust pieces can be generated useing a simple earthquake visualizasion
+bbox <- c(left = -170, bottom = -60, right = 170, top = 80)
+# World_map <- get_stamenmap(bbox, zoom = 3, maptype="terrain")
+# save(World_map, file='map_data/all_world_map.RData')
+load(file = '../../map_data/all_world_map.RData')
+World_map %>% ggmap(extent = "device") + geom_point(data = worldwide, aes(y = latitude, x = longitude), alpha = 0.5, color = 'red', size = 0.1)
+
+
+# Brazil, Russia and Canada are earthquake safe countries
+# look at the island of hawaii! :D
+# as described in question 10 alaska has the most number of earthquakes in recent years. it has 3 of 6 biggest
+# recorded earthquakes in history
+```
+

@@ -1,0 +1,433 @@
+---
+title: "Association rules"
+subtitle: "Movie recommender systems"
+author: "Mohammadmahdi Faryabi - STD-ID: 93101951"
+date: "`r Sys.time()`"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+<div align="center">
+<img  src="images/rs_cover.jpg"  align = 'center'>
+</div>
+
+> <p dir="RTL"> 
+با استفاده از داده نظرهای فیلم به سوالات زیر پاسخ دهید.
+</p>
+
+><p>
+parsing required data, building datasets, and loading required packages...
+</p>
+
+```{r Q0, cache=TRUE}
+library(readr)
+library(dplyr)
+library(stringr)
+library(highcharter)
+library(knitr)
+
+
+movies <- 
+  read_delim("../../ml-10M100k/movies.dat", delim = "::", col_names = c("movie_id", NA, "movie_title", NA, "movie_genres")) %>% 
+  select(movie_id, movie_title, movie_genres)
+
+# data.frame(movie_id=c(NA), movie_title=c(NA), movie_genre=c(NA)) -> genre_movies
+# movie_count <- dim(movies)[1]
+# for (i in 1:movie_count) {
+#   movies[i,] %>% .$movie_genres %>%  str_extract_all("\\w+") %>% .[[1]] -> movie_genres
+#   movies[i,] %>% .$movie_id -> movie_id
+#   movies[i,] %>% .$movie_title -> movie_title
+#   for (movie_genre in movie_genres) {
+#     data.frame(movie_id=c(movie_id), movie_title=c(movie_title), movie_genre=c(movie_genre)) %>% rbind(genre_movies) -> genre_movies
+#   }
+# }
+
+# save(genre_movies, file = 'saved_data/genre_movies.RData')
+load(file = '../../saved_data/genre_movies.RData')
+genre_movies <- genre_movies %>% .[complete.cases(.),]
+
+
+extract_year_from_timestamp <- function(timestamp) {
+  return(timeDate::timeDate(timestamp) %>% .@Data %>% format('%Y'))
+}
+
+read_delim("../../ml-10M100k/tags.dat", delim = "::", col_names = c("user_id", NA, "movie_id", NA, "tag", NA, "timestamp")) %>%
+  select(user_id, movie_id, tag, timestamp) -> tags
+tags %>% mutate(year = extract_year_from_timestamp(timestamp)) -> tags
+
+read_delim("../../ml-10M100k/ratings.dat", delim = "::", col_names = c("user_id", NA, "movie_id", NA, "rating", NA, "timestamp")) %>% 
+  select(user_id, movie_id, rating, timestamp) -> ratings
+ratings %>% mutate(year = extract_year_from_timestamp(timestamp)) -> ratings
+```
+
+***
+
+<p dir="RTL">
+۱. آماره های زیر را بیابید.
+الف. محبوب ترین فیلم کدام است؟
+ب. بیشترین نظرات درباره چه فیلمی داده شده است؟
+پ. منفورترین فیلم کدام است؟
+ت. تعداد فیلم های ساخته شده در هر سال
+ث. در هر سالی مردم به چه ژانری علاقه مند بوده اند.
+</p>
+
+```{r Q1, cache=TRUE}
+########################################################################################################
+## Q1 - most loved movie
+
+ratings %>% group_by(movie_id) %>% summarise(mean_rate = mean(rating, na.rm = TRUE), votes = n()) %>%
+  full_join(movies, by = 'movie_id') %>% select(movie_id, mean_rate, movie_title, votes) %>% 
+  .[complete.cases(.),] %>% ungroup -> q1_data
+
+q1_data %>% filter(votes > 10000) %>% arrange(desc(mean_rate)) %>% slice(1:20) -> print_table
+kable(print_table)
+
+## Q1 - most votes
+
+q1_data %>% arrange(desc(votes)) %>% slice(1:20) -> print_table
+kable(print_table)
+
+## Q1 - most hated movie
+
+q1_data %>% filter(votes > 1000) %>% arrange(mean_rate) %>% slice(1:20) -> print_table
+kable(print_table)
+
+
+## Q1 - movie counts each year
+
+# ratings %>% ungroup %>% group_by(movie_id) %>% mutate(prod_year = min(year, na.rm = TRUE)) %>%
+#   select(movie_id, prod_year) %>% unique -> movie_year
+# save(movie_year, file = 'saved_data/movie_year.RData')
+load(file = '../../saved_data/movie_year.RData')
+
+# movie_year %>% ungroup %>% group_by(prod_year) %>% summarise(movie_count = n()) %>%
+#   hchart(type = 'line', hcaes(x = prod_year, y = movie_count))
+
+get_year_from_name <- function(name) {
+  return(name %>% str_extract(pattern = regex('\\(\\d{4}\\)')) %>% str_sub(2, 5))
+}
+movies %>% mutate(prod_year = get_year_from_name(movie_title)) -> movie_year_actual
+
+movie_year_actual %>% select(movie_title, prod_year) %>% group_by(prod_year) %>%
+  summarise(movie_count = n()) %>% .[complete.cases(.),] %>%
+  hchart(type = 'line', hcaes(x = prod_year, y = movie_count))
+
+## Q1 - popular gener each year
+
+q1_data %>% full_join(
+    movie_year %>% rename(year = 'prod_year'),
+    by = 'movie_id'
+  ) %>% full_join(
+    genre_movies %>% select(-movie_title),
+    by = 'movie_id'
+  ) %>% ungroup %>% group_by(year, movie_genre) %>%
+  summarise(tot_votes = sum(votes), mean_rate = sum(mean_rate * votes)/tot_votes) %>% ungroup %>% 
+  filter(tot_votes > 10000) %>% group_by(year) %>% arrange(desc(mean_rate)) %>% top_n(1) -> print_table
+
+kable(print_table)
+
+
+```
+
+***
+
+<p dir="RTL">
+۲. ژانر فیلم ها را استخراج نمایید.  سپس آماره های زیر را استخراج نمایید.
+الف. نمودار ستونی تعداد فیلم های هر ژانر
+ب. نمودار همبستگی ژانرها
+پ. متوسط امتیاز به هر ژانر
+ت. دوران طلایی فیلم سازی 
+</p>
+
+```{r Q2, cache=TRUE}
+########################################################################################################
+## Q2 - film count per genre
+
+genre_movies -> q2_data
+q2_data$movie_genre <- as.character(q2_data$movie_genre)
+
+q2_data %>% group_by(movie_genre) %>% summarise(movie_count = n()) %>% filter(movie_count > 10) %>%
+  arrange(desc(movie_count)) %>% mutate(movie_genre = ifelse(movie_genre == 'Fi', 'Sci-Fi', movie_genre)) %>% 
+  filter(!movie_genre %in% c('Sci', 'IMAX', 'Film')) -> q2_plot_data
+q2_plot_data %>% hchart(type = 'column', hcaes(x = movie_genre, y = movie_count))
+
+## Q2 - corelation plot for genres
+
+q2_plot_data %>% filter(movie_genre != 'Sci-Fi') %>% .$movie_genre -> main_genres
+main_genres %>% length -> main_genres_count
+q2_data %>% filter(movie_genre != 'Sci-Fi') %>% select(movie_title) %>% unique -> main_movies
+main_movies %>% dim %>% .[1] -> main_movies_count
+
+q2_data %>% filter(movie_genre %in% main_genres) -> q2_data
+q2_data$movie_title <- as.character(q2_data$movie_title)
+
+
+q2_mat_data <- data.frame(matrix(nrow = main_movies_count, ncol = main_genres_count, data = 0))
+rownames(q2_mat_data) <- main_movies$movie_title
+colnames(q2_mat_data) <- main_genres
+
+for (index in 1:dim(q2_data)[1]) {
+  title <- q2_data[index,][2] %>% as.character
+  genre <- q2_data[index,][3] %>% as.character
+  q2_mat_data[title, genre] <- 1
+}
+
+q2_mat_data %>% cor() %>% hchart()
+
+## Q2 - average genre rating
+
+q1_data %>% full_join(
+  movie_year %>% rename(year = 'prod_year'),
+  by = 'movie_id'
+) %>% full_join(
+  genre_movies %>% select(-movie_title),
+  by = 'movie_id'
+) %>% ungroup %>% group_by(movie_genre) %>%
+  summarise(tot_votes = sum(votes), mean_rate = sum(mean_rate * votes)/tot_votes) %>% ungroup %>% 
+  filter(tot_votes > 80000) %>% arrange(desc(mean_rate)) -> print_table
+kable(print_table)
+
+
+## Q2 - Golden Era
+
+movie_year_actual %>% select(movie_title, prod_year) %>% group_by(prod_year) %>%
+  summarise(movie_count = n()) %>% .[complete.cases(.),] %>%
+  hchart(type = 'line', hcaes(x = prod_year, y = movie_count))
+
+movie_year_actual %>% select(prod_year, movie_id) %>% full_join(
+  q1_data %>% select(-movie_title),
+  by = 'movie_id'
+) %>% ungroup %>% group_by(prod_year) %>% arrange(desc(mean_rate)) %>% filter(votes > 5000) %>%
+  top_n(5, mean_rate) %>% ungroup %>% group_by(prod_year) %>%
+  summarise(mean_top_rate = sum(mean_rate * votes)) %>% .[complete.cases(.),] -> rate_data
+
+rate_data %>% hchart(type = 'line', hcaes(x = prod_year, y = mean_top_rate), color = 'red')
+
+
+# according to the plots, sounds like 1990s -> 1994 is the Golden cinema era.
+
+```
+
+***
+
+<p dir="RTL">
+۳. نمودار ابر لغات را بر حسب کلمات عنوان فیلم ها رسم نمایید.
+</p>
+
+```{r Q3, cache=TRUE}
+########################################################################################################
+## Q3
+
+movies %>% select(movie_title) -> q3_titles
+
+library(tidytext)
+extract_words <- function(data) {
+  data %>%
+    str_replace_all(pattern = '"', replacement = '') %>% 
+    str_replace_all(pattern = '`', replacement = '') %>%
+    str_replace_all(pattern = '\'', replacement = '') %>%
+    str_replace_all(pattern = '.*\\|.*', replacement = '') %>%
+    str_replace_all(pattern = '\\d+', replacement = '') %>%
+    str_replace_all(pattern = '�', replacement = ' ') %>% 
+    str_replace_all(pattern = '[[:punct:]]', replacement = ' ') %>%
+    str_split(pattern = "\\s+") %>%
+    unlist() %>% table() %>% as.data.frame() %>% slice(-1) -> result
+  colnames(result) <- c('word', 'count')
+  return(result)
+}
+extract_semantic_words <- function(data) {
+  data %>% extract_words() %>% filter(!(tolower(word) %in% stop_words$word)) -> result
+  return(result)
+}
+
+
+q3_titles %>% extract_semantic_words %>% arrange(desc(count)) %>% slice(1:100) -> wordcloud_data
+
+library(wordcloud)
+
+wordcloud(wordcloud_data$word,wordcloud_data$count,
+          c(5,.3), random.order = FALSE, colors=brewer.pal(8, "Dark2"))
+```
+
+***
+
+<p dir="RTL">
+۴. با استفاده از قوانین همبستگی یک توصیه گر برای فیلم ها بسازید. شبیه ترین فیلم ها به لیست زیر را پیدا کنید.
+</p>
+
+* Castle in the Sky (1986)
+* Cast Away (2000)
+* No Country for Old Men (2007)
+* Memento 
+
+><p>
+I think there was a problem with my way of parsing the files, I couldn't find the information related to <br>
+No Country for Old Men (2007) movie. Instead I used another movie: Shawshank Redemption, The (1994).
+</p>
+
+```{r Q4, cache=TRUE}
+########################################################################################################
+## Q4
+
+library(tidyr)
+
+# ratings %>% select(user_id, movie_id, rating) %>% spread(key = 'movie_id', value = 'rating') -> transactions
+# transactions[!is.na(transactions)] <- 1
+# transactions[is.na(transactions)] <- 0
+# save(transactions, file = 'saved_data/transactions.RData')
+# load(file = '../../saved_data/transactions.RData')
+
+library(arules)
+library(arulesViz)
+library(colorspace)
+
+# transactions_matrix <- transactions %>% select(-user_id) %>% as.matrix
+
+# transactions_obj <- as(transactions_matrix[1:10000,], 'transactions')
+# save(transactions_obj, file = '../../saved_data/transactions_obj.RData')
+load(file = '../../saved_data/transactions_obj.RData')
+
+grules <- apriori(transactions_obj, parameter = list(support = 0.009, confidence = 0.25, minlen = 2, maxlen = 2))
+
+# Castle in the Sky (Tenkû no shiro Rapyuta) (1986) -> 6350
+
+# 3000 -> Princess Mononoke (Mononoke-hime) (1997)
+# 5618 -> Spirited Away (Sen to Chihiro no kamikakushi) (2001)
+# 8961 -> Incredibles, The (2004)
+
+subset(grules, subset = lhs %in% c('6350')) %>% sort(by = 'lift', decreasing = TRUE) %>%
+  inspect
+
+
+# Cast Away (2000)                                  -> 4022
+
+# 5388 -> Insomnia (2002)
+# 4310 -> Pearl Harbor (2001)
+# 5502 -> Signs (2002)
+
+subset(grules, subset = lhs %in% c('4022')) %>% sort(by = 'lift', decreasing = TRUE) %>%
+  inspect
+
+
+# Memento (2000)                                    -> 4226
+
+# 4848 -> Mulholland Drive (2001)
+# 3949 -> Requiem for a Dream (2000)
+# 5902 -> Adaptation (2002)
+
+subset(grules, subset = lhs %in% c('4226')) %>% sort(by = 'lift', decreasing = TRUE) %>%
+  inspect
+
+
+# Shawshank Redemption, The (1994)                  -> 318
+
+# 300  -> Quiz Show (1994)
+# 1704 -> Good Will Hunting (1997)
+# 508  -> Philadelphia (1993)
+
+subset(grules, subset = lhs %in% c('318')) %>% sort(by = 'lift', decreasing = TRUE) %>%
+  inspect
+
+```
+
+***
+
+<p dir="RTL">
+۵. تمرین سخت: در گیت هاب برای خود اکانت درست کنید. همه تمرین های خود را آنجا بارگذاری کنید! و لینک آن را ارسال نمایید.
+</p>
+
+><p>
+All of my assigmnemts, the soulutions and their relative data are available 
+<a href="https://github.com/faryabimm/2018-spring-Data-Analysis">here.</a>
+</p>
+
+***
+
+<p dir="RTL">
+۶. پنج انتقاد از درس و نحوه تدریس را بیان کنید.
+</p>
+
+><p>
+I will not write in english for the sake of the rest of the questions :p <br>
+</p>
+><p dir="RTL">
+۱. سرعت تدریس در ارائهی برخی مطالب درسی مانند آزمون فرض و دستهبندی خیلی بالا بود. من فکر میکنم فرض<br>
+بر این بود که دانشجویان آمار مقدماتی دانشکدهی ریاضی را که پیچیدهتر از آمار دانشکدهی کامپیوتر است گذراندهاند که به نظرم خیلی فرض درستی نیست. بسیاری از مخاطبین این درس دانشجویان دانشکدههای دیگر هستند. ای کاش کمی با عمق بیشتری این مباحث را پوشش دهید.
+<br><br>
+۲. ای کاش زمان شروع درس ساعت ۸ صبح نباشد. رسیدن به کلاس در این ساعت در برخی اوقات سال مشقت بار است:دی
+<br><br>
+۳. ای کاش بیشتر روی مسابقات واقعی کار میشد. تمرینی که دادههای وبسایت kaggle را استفاده کردیم و نتایج را در آنجا قرار دادیم بسیار آموزنده ولذت بخش بود! ای کاش این تجربه بیشتر در کلاس تکرار میشد.
+<br><br>
+۴. ای کاش آزمونهای درس بیشتر مفهومی باشد و در برگیرندهی نکات عملی یاد گرفته شده (مطابق ماهیت درس) و نه آزمون محاسبهی عددی مقدار p-value یک تست آماری.
+<br><br>
+۵. ای کاش به صورت مستمر مطالب تئوری آماری مورد نیاز در قالب مطالعهی فردی توسط دانشجویان فراگرفته شود و توسط شما در قالب تمرینها و آزمونکهایی تئوری به آزمون گذاشتهشود.
+</p>
+
+***
+
+<p dir="RTL">
+۷. پنج پیشنهاد برای بهتر شدن درس بیان کنید.
+</p>
+
+
+><p dir="RTL">
+۱. درس ساعت ۸ صبح شروع نشود
+<br><br>
+۲. مباحث تئوری مورد نیاز در کنار درس مورد ارزیابی توسط تمرین قرار بگیرد تا مطالعهی فردی صورت گرفته و یادگیری آنها نیز حاصل شود.
+<br><br>
+۳. به نظر بنده درسی که اینقدر بار فعالیت عملی و تمرین بالایی دارد نباید نزدیک به ۸ نمره آزمون داشته باشد.
+<br><br>
+۴. مقداری یادگیری ماشین هم در کنار این درس آموزش داده شود یا درسی در ادامهی این درس تحت این عنوان توسط شما ارائه شود.
+<br><br>
+۵. در یکی از تمرینها جمعآوری چالشی داده هم به عنوان یادگیری گنجانده شود.
+<br><br>
+۶. روشهای مناسب برای ترمیم دادههای ناقص را سر کلاس درس بیان کنید.
+</p>
+
+***
+
+<p dir="RTL">
+۸. سه موضوع آماری جدید برای جایگزینی در سرفصل ها پیشنهاد دهید.
+</p>
+
+><p dir="RTL">
+۱. مدلهای پیچیدهتر از مدلهای خطی
+<br><br>
+۲. یاد دادن روشهای مپ کردن مساله به روش حل
+<br><br>
+۲. بررسی موضوع سریهای زمانی و نرمسازی دادهها
+</p>
+
+***
+
+<p dir="RTL"> 
+۹. سه داده جالب برای کار در کلاس پیشنهاد دهید.
+</p>
+
+><p dir="RTL">
+۱. تحلیل دادهی اماکن شهر تهران برای یافتن موقعیتهای شغلی جدید.
+<br><br>
+۲. استفاده از آمار برای تشخیص هرزنامهها به صورت خودکار
+<br><br>
+۳. تحلیل دادهی صحبتهای نمایندهها در مجلس شورای اسلامی(این دادهها توسط مجلس به صورت مرتب آرشیو میشود).
+</p>
+
+***
+
+<p dir="RTL"> 
+۱۰. چهار نکته مهمی که در کلاس یاد گرفتید را بیان کنید.
+</p>
+
+><p dir="RTL">
+۱. واقعا باید از overfit کردن ترسید! سعی میکنم همیشه مدلی که میخوام بسازم رو حتی اگه شده در داده نویز بندازم به داده وابستهی شدید نکنم.
+<br><br>
+۲. واقعا شاید بعضی همبستگیهای ظاهری معنی خاصی نداشته باشن.
+<br><br>
+۳. وقتی چیز زیادی در مورد داده نمیدونیم سعی نکنیم از مدلهای پیچیده و با فرضهای عجیب استفاده کنیم.
+<br><br>
+۴. هیچوقت نباید یه آزمایش یا بررسی رو اینقدر انجام بدیم تا نتیجهای که دوست داریم ازش در بیاد چون احتمالا همیشه میاد!
+<br><br>
+۵. نابرده رنج گنج میسر نمیشود! پ.ن.: پدرمون در اومد سر این درس :دی
+</p>
